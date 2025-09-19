@@ -47,14 +47,20 @@ export const prepareKlaimData = (data: object) => {
     if (r[key]) r[key] = formatDateTime(r[key]);
   });
 
-  // Loop through tarifFields to process numeric values
+ // pastikan selalu ada tarif_rs
+  if (!r.tarif_rs) r.tarif_rs = {};
+
+  // bersihkan semua titik/koma di tarif_rs
   tarifFields.forEach(({ name }) => {
-    const value = r[name];
+    const raw = r.tarif_rs[name] ?? "0";
+  const clean = String(raw).replace(/\./g, "").replace(/,/g, ".");
+const parsed = clean === "" ? "0" : clean;
 
-    // Ensure value is processed if not undefined or empty, otherwise set to 0
-    r[name] = value !== undefined && value !== '' ? Number(value.replace(/\.|,/g, '')) : 0;
+    // 👉 DEBUG log
+    console.log(`[prepareKlaimData] ${name} | before:`, raw, "| after:", parsed);
+
+    r.tarif_rs[name] = parsed;
   });
-
   // Return the result
   return r;
 };

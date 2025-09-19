@@ -155,7 +155,9 @@ export type Prosedur = {
     'kode'?: string;
     'deskripsi_panjang'?: string;
     'deskripsi_pendek'?: string;
-  }
+  };
+  // Add the new 'jumlah' property
+  'jumlah'?: number; 
 }
 
 // ==============================

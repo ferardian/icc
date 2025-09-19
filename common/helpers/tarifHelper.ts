@@ -19,15 +19,18 @@ export const getTotalTarifRS = (state: FormData) => {
     "obat_kemoterapi",
     "alkes",
     "bmhp",
-    "sewa_alat"
-  ];
+    "sewa_alat",
+  ] as const;
 
-  // get nominal value from state and sum it
-  const nominal = nominalKey.reduce((acc, key) => {
-    const value = state[key];
-    const numberValue = Number(value.replaceAll(".", "").replaceAll(",", "."));
+  return nominalKey.reduce((acc, key) => {
+    const rawValue = state.tarif_rs?.[key] ?? "0";
+    const value = String(rawValue);
+
+    const numberValue = Number(
+      value.replaceAll(".", "").replaceAll(",", ".")
+    );
+
     return acc + (!isNaN(numberValue) ? numberValue : 0);
   }, 0);
+};
 
-  return nominal;
-}

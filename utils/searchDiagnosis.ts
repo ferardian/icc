@@ -1,72 +1,86 @@
+import { ref } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 
-export const [dul, iil] = [ref(false), ref(false)]
-export const [pul, pil] = [ref(false), ref(false)]
+const loadingStates = {
+  unuDiagnosa: ref(false),
+  unuProsedur: ref(false),
+  idrgDiagnosa: ref(false),
+  idrgProsedur: ref(false),
+  inacbgDiagnosa: ref(false),
+  inacbgProsedur: ref(false),
+}
 
+async function fetchHelper(query: string, endpoint: string, loader: any) {
+  const config = useRuntimeConfig()
+  loader.value = true
+
+  if (query.length < 3) {
+    loader.value = false
+    return []
+  }
+
+  try {
+    const debounced = useDebounceFn(async () => {
+      const res: any = await $fetch(`${config.public.API_V2_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: { search: { value: query } },
+      })
+
+      let items: any[] = []
+
+      // ==== Cek struktur response ====
+      if (res?.data?.data) {
+        // struktur UNU / IDRG
+        items = res.data.data
+        return items.map((item: any) => ({
+          value: item.code,
+          title: item.description,
+          label: `${item.code} - ${item.description}`,
+          accpdx: item.accpdx, // Add accpdx to the response item
+          validcode: item.validcode, // Add validcode to the response item
+          disabled: item.validcode === "0" // 👉 kalau 0, otomatis disabled
+        }))
+      } else if (res?.response?.data) {
+        // struktur INACBG
+        items = res.response.data
+        return items.map((arr: any[]) => ({
+          value: arr[1],             // kode ICD
+          title: arr[0],             // deskripsi
+          label: `${arr[1]} - ${arr[0]}`,
+        }))
+      }
+
+      return []
+    }, 800)
+
+    return await debounced()
+  } catch (err) {
+    console.error('fetchHelper error:', err)
+    return []
+  } finally {
+    loader.value = false
+  }
+}
+
+// === Wrappers ===
 export async function fetchDiagnosaUnu(query: string) {
-  const config = useRuntimeConfig();
-  dul.value = true;
-
-  if (query.length < 3) {
-    dul.value = false;
-    return [];
-  }
-
-  const { data, status } = await useDebounceFn(async () => await useFetch(`${config.public.API_V2_URL}/eklaim/diagnosis/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ search: { value: query } }),
-  }), 1200)();
-
-  if (status.value == 'success') {
-    const d = data.value as any;
-    if (d.response.count > 0) {
-      const mapped = d.response.data.map((item: any) => {
-        return { value: item[1], title: item[0], label: `${item[1]} - ${item[0]}` };
-      });
-
-      dul.value = false;
-      return mapped;
-    }
-
-    dul.value = false;
-    return [];
-  }
-
-  dul.value = false;
-  return [];
+  return fetchHelper(query, '/icd10_im', loadingStates.unuDiagnosa)
 }
-
 export async function fetchProsedurUnu(query: string) {
-  const config = useRuntimeConfig();
-  pul.value = true;
-
-  if (query.length < 3) {
-    pul.value = false;
-    return [];
-  }
-
-  const { data, status } = await useDebounceFn(async () => await useFetch(`${config.public.API_V2_URL}/eklaim/procedures/search`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ search: { value: query } }),
-  }), 1200)();
-
-  if (status.value == 'success') {
-    const d = data.value as any;
-    if (d.response.count > 0) {
-      const mapped = d.response.data.map((item: any) => {
-        return { value: item[1], title: item[0], label: `${item[1]} - ${item[0]}` };
-      });
-
-      pul.value = false;
-      return mapped;
-    }
-
-    pul.value = false;
-    return [];
-  }
-
-  pul.value = false;
-  return [];
+  return fetchHelper(query, '/icd9_im', loadingStates.unuProsedur)
 }
+export async function fetchDiagnosaIdrg(query: string) {
+  return fetchHelper(query, '/icd10_idrg', loadingStates.idrgDiagnosa)
+}
+export async function fetchProsedurIdrg(query: string) {
+  return fetchHelper(query, '/icd9_idrg', loadingStates.idrgProsedur)
+}
+export async function fetchDiagnosaInacbg(query: string) {
+  return fetchHelper(query, '/eklaim/diagnosis/search', loadingStates.inacbgDiagnosa)
+}
+export async function fetchProsedurInacbg(query: string) {
+  return fetchHelper(query, '/eklaim/procedures/search', loadingStates.inacbgProsedur)
+}
+
+export { loadingStates }
