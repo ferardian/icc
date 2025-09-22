@@ -16,8 +16,6 @@
   import { getEnabledCobData, getCaraBayarData } from '~/utils/getStaticData'
   import { 
     loadingStates,
-    fetchDiagnosaUnu, 
-    fetchProsedurUnu,
     fetchDiagnosaIdrg, 
     fetchProsedurIdrg,
     fetchDiagnosaInacbg, 
@@ -38,16 +36,39 @@ const groupingData = reactive({
   status: 'normal',
 });
 
+// === STATE UNTUK TOMBOL ===
+const showGroupingButton = ref(true)       // default: tampilkan tombol grouping
+const showFinalButton = ref(true)          // default: tampilkan tombol final
+const showEditUlangButton = ref(false)     // default: tombol edit ulang hidden
+
 
   const useDiagnosaLocal = ref(false) // flag
+  const useProcedureLocal = ref(false) // flag
 
   const activeDiagnosa = computed(() => {
     return useDiagnosaLocal.value ? diagnosaLocal.value : (diagnosa ?? [])
   })
 
-  const showForm = ref(false)   // default: semua form/komponen hidden
+  const showForm = ref(true)   // default: semua form/komponen hidden
+  const showFormInacbg = ref(false)   // default: semua form/komponen hidden
   const loadingSetKlaim = ref(false)
-  
+  const isFinalLoading = ref(false)
+  const isReeditLoading = ref(false)
+  const isImporting = ref(false) // State loading untuk tombol import
+
+  // Letakkan ini di dekat deklarasi state lain di <script setup>
+
+  // === STATE UNTUK INACBG ===
+  const isInacbgGrouping = ref(false) // Loading state khusus untuk tombol grouping INACBG
+  const showInacbgResult = ref(false) // Tampilkan/sembunyikan tabel hasil INACBG
+  const inacbgResultData = reactive({
+    cbg: '',
+    cbg_desc: '',
+    total_tarif: '',
+    kelas: '',
+    versi: '',
+  })
+
   
   const diagnosaKey = ref(0)
   
@@ -180,133 +201,286 @@ const prosedurLocal = ref<Prosedur[]>(prosedur ?? [])
     }
   })
   
-  // Fetch the COB data on component mount
-  onMounted(async () => {
-    optionLoading.value = true
+    // Fetch the COB data on component mount
+    onMounted(async () => {
+      console.log("KlaimNew mounted")
+      optionLoading.value = true
+
     
-    state.kd_dokter = regPeriksa?.kd_dokter ?? ''
-    state.nama_dokter = regPeriksa?.dokter?.nm_dokter ?? ''
-    
-    // Set Tanggal Keluar
-    let tgl_keluar = ref('') 
-    if (kamarInap && kamarInap.detail.length > 0) {
-      tgl_keluar = computed(() => getTanggalKeluar(kamarInap));
-    }
-    
-    if (state.jenis_rawat == 1) { // Set Tanggal Pulang by jenis rawat (1 = Rawat Inap, 2 = Rawat Jalan)
-      state.tgl_pulang = new Date(tgl_keluar.value)
-    } else {
-      state.tgl_pulang = state.tgl_masuk
-    }
-
-    try {
-    const { data, error } = await useFetch(
-      `${runtimeConfig.public.API_V2_URL}/idrg/${sep?.no_sep}`,
-      {
-        headers: {
-          Authorization: `Bearer ${tokenStore?.accessToken}`,
-          Accept: 'application/json',
-        },
-      }
-    )
-
-    if (error.value) {
-      console.error("Gagal ambil klaim:", error.value)
-    } else if (data.value) {
-      // parse isi kolom JSON
-      let claimRes = null
-      try {
-        claimRes = JSON.parse(data.value.set_claim_res)
-      } catch (e) {
-        console.warn("Format JSON tidak valid:", e)
-      }
-
-        console.log("Parsed claimRes:", claimRes)
-
-      if (claimRes?.metadata?.code === 200) {
-        showForm.value = true
-      }
-
-      // New logic for grouper_res
-      let grouperRes = null;
-      try {
-          grouperRes = JSON.parse(data.value.grouper_res);
-      } catch (e) {
-          console.warn("Format JSON grouper_res tidak valid:", e);
-      }
-
-      if (grouperRes?.metadata?.code === 200) {
-          const res = grouperRes.response_idrg;
-          if (res) {
-              showGroupingResult.value = true;
-              groupingData.jenisRawat = `${state.jenis_rawat === 1 ? 'Rawat Inap' : 'Rawat Jalan'} (${state.los} Hari)`;
-              groupingData.mdc = res.mdc_description;
-              groupingData.mdcCode = res.mdc_number;
-              groupingData.drg = res.drg_description;
-              groupingData.drgCode = res.drg_code;
-              groupingData.status = 'normal'; // The JSON indicates a 'normal' status
-          }
-      }
-
-     // --- NEW: parsing idrg_diagnosa_res ---
-let diagnosaRes = null
-try {
-  diagnosaRes = JSON.parse(data.value.idrg_diagnosa_res)
-} catch (e) {
-  console.warn("Format JSON idrg_diagnosa_res tidak valid:", e)
-}
-
-if (diagnosaRes?.metadata?.code === 200) {
-  const dxList = diagnosaRes.data?.expanded ?? []
-  diagnosaLocal.value = dxList.map((dx: any) => ({
-    kd_penyakit: dx.code,
-    penyakit: {
-      kd_penyakit: dx.code,
-      nm_penyakit: dx.display
-    }
-  }))
-  useDiagnosaLocal.value = true
-  console.log("Loaded diagnosa dari idrg_diagnosa_res:", diagnosaLocal.value)
-} else {
-  // fallback: pakai props diagnosa yang lama
-   // fallback ke props diagnosa
-  useDiagnosaLocal.value = false
-  diagnosaLocal.value = diagnosa ?? []
-}
-    }
-  } finally {
-    optionLoading.value = false
-  }
-    
-    setTimeout(async () => {
-      try {
-        const [cob, cbo, jto] = await Promise.all([
-        getEnabledCobData(),
-        getCaraBayarData(),
-        getJenisTarifData(),
-        ]);
-        
-        state.payor_label = state.payor_cd = cbo[0].label
-        state.payor_id = cbo[0].value
-        
-        cobOptions.push(...cob);
-        carabayarOptions.push(...cbo);
-        jenisTarifOptions.push(...jto);
-      } catch (error) {
-        console.error('Failed to load COB options:', error)
+    showForm.value = true
+    showFormInacbg.value = false
+      
+      state.kd_dokter = regPeriksa?.kd_dokter ?? ''
+      state.nama_dokter = regPeriksa?.dokter?.nm_dokter ?? ''
+      
+      // Set Tanggal Keluar
+      let tgl_keluar = ref('') 
+      if (kamarInap && kamarInap.detail.length > 0) {
+        tgl_keluar = computed(() => getTanggalKeluar(kamarInap));
       }
       
+      if (state.jenis_rawat == 1) { // Set Tanggal Pulang by jenis rawat (1 = Rawat Inap, 2 = Rawat Jalan)
+        state.tgl_pulang = new Date(tgl_keluar.value)
+      } else {
+        state.tgl_pulang = state.tgl_masuk
+      }
+
+      try {
+      console.log("masuk try")  
+      console.log("Jenis Rawat:", state.jenis_rawat)
+      console.log("SEP:", sep)
+      const { data, error, status, execute } = await useFetch(
+        `${runtimeConfig.public.API_V2_URL}/eklaim/idrg/${sep?.no_sep}`,
+        {
+          headers: {
+            Authorization: `Bearer ${tokenStore?.accessToken}`,
+            Accept: 'application/json',
+          },
+           immediate: false,   // <--- paksa jalan langsung
+        }
+      )
+
+      // jalankan fetch
+await execute()
+      console.log("STATUS:", status.value)
+console.log("ERROR:", error.value)
+console.log("DATA RAW:", data.value)
+console.log("FULL RESPONSE:", JSON.stringify(data.value, null, 2))
+      console.log("Data INI : ",data.value)
+
+      if (error.value) {
+      console.log("eror")
+
+        console.error("Gagal ambil klaim:", error.value)
+      } else if (data.value) {
+        console.log("sukses")
+        // parse isi kolom JSON
+        let claimRes = null
+        try {
+          claimRes = JSON.parse(data.value.set_claim_res)
+        } catch (e) {
+          console.warn("Format JSON tidak valid:", e)
+        }
+
+          console.log("Parsed claimRes:", claimRes)
+
+        if (claimRes?.metadata?.code === 200) {
+          showForm.value = true
+          console.log("Showform:",showForm.value)
+        }
+
+        // New logic for grouper_res
+        let grouperRes = null;
+        try {
+            grouperRes = JSON.parse(data.value.grouper_res);
+        } catch (e) {
+            console.warn("Format JSON grouper_res tidak valid:", e);
+        }
+
+        if (grouperRes?.metadata?.code === 200) {
+            const res = grouperRes.response_idrg;
+            if (res) {
+                showGroupingResult.value = true;
+                groupingData.jenisRawat = `${state.jenis_rawat === 1 ? 'Rawat Inap' : 'Rawat Jalan'} (${state.los} Hari)`;
+                groupingData.mdc = res.mdc_description;
+                groupingData.mdcCode = res.mdc_number;
+                groupingData.drg = res.drg_description;
+                groupingData.drgCode = res.drg_code;
+                groupingData.status = 'normal'; // The JSON indicates a 'normal' status
+            }
+        }
+
+      // --- NEW: parsing idrg_diagnosa_res ---
+  let diagnosaRes = null
+  try {
+    diagnosaRes = JSON.parse(data.value.idrg_diagnosa_res)
+  } catch (e) {
+    console.warn("Format JSON idrg_diagnosa_res tidak valid:", e)
+  }
+
+  diagnosaLocal.value = []  // reset dulu
+  if (diagnosaRes?.metadata?.code === 200) {
+    const dxList = diagnosaRes.data?.expanded ?? []
+    diagnosaLocal.value = dxList.map((dx: any) => ({
+      kd_penyakit: dx.code,
+      penyakit: {
+        kd_penyakit: dx.code,
+        nm_penyakit: dx.display
+      }
+    }))
+    useDiagnosaLocal.value = true
+    console.log("Loaded diagnosa dari idrg_diagnosa_res:", diagnosaLocal.value)
+  } else {
+    // fallback: pakai props diagnosa yang lama
+    // fallback ke props diagnosa
+    useDiagnosaLocal.value = false
+    diagnosaLocal.value = diagnosa ?? []
+  }
+
+ // --- parsing idrg_procedure_res ---
+let procedureRes = null
+try {
+  procedureRes = JSON.parse(data.value.idrg_procedure_res)
+} catch (e) {
+  console.warn("Format JSON idrg_procedure_res tidak valid:", e)
+}
+
+prosedurLocal.value = [] // reset
+if (procedureRes?.metadata?.code === 200) {
+  const pxList = procedureRes.data?.expanded ?? []
+  prosedurLocal.value = pxList.map((px: any) => ({
+    kode: px.code,
+    penyakit: {
+      deskripsi_panjang: px.display
+    },
+    jumlah: px.multiplicity ? Number(px.multiplicity) : 1 // ✅ ambil jumlah dari multiplicity
+  }))
+  useProcedureLocal.value = true
+  console.log("Loaded prosedur dari idrg_procedure_res:", prosedurLocal.value)
+} else {
+  useProcedureLocal.value = false
+  prosedurLocal.value = prosedur ?? []
+}
+
+// --- NEW: parsing final_res ---
+let finalRes = null
+try {
+  finalRes = JSON.parse(data.value.final_res)
+} catch (e) {
+  console.warn("Format JSON final_res tidak valid:", e)
+}
+
+if (finalRes?.metadata?.code === 200) {
+  final_res.value = finalRes
+  console.log("Final grouper sudah sukses:", finalRes)
+
+  // hide tombol Grouping & Final
+  showGroupingButton.value = false
+  showFinalButton.value = false
+
+  // tampilkan tombol Edit Ulang IDRG
+  showEditUlangButton.value = true
+
+  // Tampilkan form INACBG
+  showFormInacbg.value = true
+} else {
+  // kalau belum final, tetap tampilkan tombol Grouping & Final
+  showGroupingButton.value = true
+  showFinalButton.value = true
+  showEditUlangButton.value = false
+}
+
+// --- NEW: parsing reedit_res ---
+let reeditRes = null
+try {
+  reeditRes = JSON.parse(data.value.reedit_res)
+} catch (e) {
+  console.warn("Format JSON reedit_res tidak valid:", e)
+}
+
+if (reeditRes?.metadata?.code === 200) {
+  console.log("Re-edit IDRG aktif:", reeditRes)
+
+  // Tampilkan tombol Grouping & Final lagi
+  showGroupingButton.value = true
+  showFinalButton.value = true
+
+  // Hide tombol Edit Ulang IDRG
+  showEditUlangButton.value = false
+}
+
+// --- NEW: parsing import_idrg_to_inacbg_res ---
+let importRes = null;
+try {
+  // Ganti `import_idrg_to_inacbg_res` dengan nama kolom yang benar dari DB Anda
+  importRes = JSON.parse(data.value.import_idrg_to_inacbg_res);
+} catch (e) {
+  console.warn("Format JSON import_idrg_to_inacbg_res tidak valid atau tidak ada");
+}
+
+if (importRes?.metadata?.code === 200 && importRes?.data) {
+  console.log("Memuat data import INACBG yang sudah ada:", importRes);
+  
+  const diagnosaData = importRes.data?.diagnosa?.expanded;
+  if (diagnosaData && Array.isArray(diagnosaData)) {
+    diagnosaInacbg.value = diagnosaData.map((dx: any) => ({
+      kd_penyakit: dx.code,
+      penyakit: {
+        kd_penyakit: dx.code,
+        nm_penyakit: dx.display,
+      },
+    }));
+  }
+
+  const prosedurData = importRes.data?.procedure?.expanded;
+  if (prosedurData && Array.isArray(prosedurData)) {
+    prosedurInacbg.value = prosedurData.map((px: any) => ({
+      kode: px.code,
+      penyakit: {
+        kode: px.code,
+        deskripsi_panjang: px.display,
+      },
+    }));
+  }
+}
+
+// --- BARU: Parsing hasil grouping INA-CBG yang sudah ada ---
+let inacbgGrouperRes = null;
+try {
+  // Pastikan nama kolom 'inacbg_grouper_res' sesuai dengan yang ada di respons API Anda
+  inacbgGrouperRes = JSON.parse(data.value.grouper_inacbg_stage1_res); 
+} catch (e) {
+  console.warn("Format JSON inacbg_grouper_res tidak valid atau tidak ada");
+}
+
+if (inacbgGrouperRes?.metadata?.code === 200) {
+  console.log("Memuat hasil grouping INACBG yang sudah ada:", inacbgGrouperRes);
+
+  const cbgResult = inacbgGrouperRes.response; // Sesuaikan dengan struktur respons Anda
+  if (cbgResult) {
+    showInacbgResult.value = true;
+    inacbgResultData.cbg = cbgResult.cbg.code;
+    inacbgResultData.cbg_desc = cbgResult.cbg.description;
+    inacbgResultData.total_tarif = `Rp ${new Intl.NumberFormat('id-ID').format(cbgResult.cbg.tariff)}`;
+    inacbgResultData.kelas = inacbgGrouperRes.patient.class;
+    inacbgResultData.versi = inacbgGrouperRes.grouper.version;
+  }
+}
+
+      }
+    } finally {
       optionLoading.value = false
-    }, 1300)
-    
-    setTotalTarifRs(getTotalTarifRS(state))
-    setIsVip(determineKelas(sep?.klsnaik)?.code == 8)
-    
-    // if state.jkn_noreg_sitb is truly make sitbState.valid = true
-    if (state.jkn_sitb_checked_ind) {
-      sitbState.valid = true
     }
-  })
+      
+      setTimeout(async () => {
+        try {
+          const [cob, cbo, jto] = await Promise.all([
+          getEnabledCobData(),
+          getCaraBayarData(),
+          getJenisTarifData(),
+          ]);
+          
+          state.payor_label = state.payor_cd = cbo[0].label
+          state.payor_id = cbo[0].value
+          
+          cobOptions.push(...cob);
+          carabayarOptions.push(...cbo);
+          jenisTarifOptions.push(...jto);
+        } catch (error) {
+          console.error('Failed to load COB options:', error)
+        }
+        
+        optionLoading.value = false
+      }, 1300)
+      
+      setTotalTarifRs(getTotalTarifRS(state))
+      setIsVip(determineKelas(sep?.klsnaik)?.code == 8)
+      
+      // if state.jkn_noreg_sitb is truly make sitbState.valid = true
+      if (state.jkn_sitb_checked_ind) {
+        sitbState.valid = true
+      }
+    })
   
   const onChangePayorCd = (payor: CarabayarData) => {
     state.payor_label = payor.label
@@ -433,19 +607,398 @@ const groupingDiagnosaSet = async () => {
       throw new Error(error.value.data.message || "Gagal grouping diagnosa")
     }
 
-    if (status.value === "success") {
+    if (status.value === "success" && data.value) {
       addToaster(
         "Success",
         "Grouping diagnosa & prosedur berhasil",
         "green",
         "i-tabler-discount-check-filled"
       )
-      refreshLatestKlaim()
+         // --- PARSE grouper_res ---
+     
+  console.log("RAW RESPONSE GROUPING >>>", data.value)
+  const msg = data.value.message
+      if (msg?.metadata?.code === 200) {
+   const res = msg.response_idrg
+    if (res) {
+      showGroupingResult.value = true
+    groupingData.jenisRawat = `${state.jenis_rawat === 1 ? 'Rawat Inap' : 'Rawat Jalan'} (${state.los} Hari)`
+    groupingData.mdc = res.mdc_description
+    groupingData.mdcCode = res.mdc_number
+    groupingData.drg = res.drg_description
+    groupingData.drgCode = res.drg_code
+    groupingData.status = "normal"
+
+    console.log(">>> SET STATE GROUPING", {
+      showGroupingResult: showGroupingResult.value,
+      groupingData: { ...groupingData }
+    })
+    }
+  }
+      // refreshLatestKlaim()
     }
   } catch (e: any) {
     addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
   }
 }
+
+const saveAndGroupingKlaim = async () => {
+  isLoading.value = true
+  try {
+
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silahkan cek kembali data pasien")
+    }
+
+    if (state.upgrade_class_ind) {
+      if (!state.upgrade_class_class) {
+        throw new Error('Kelas pelayanan tidak boleh kosong')
+      } else if (!state.upgrade_class_payor) {
+        throw new Error('Pembiayaan tidak boleh kosong')
+      } else if (!state.upgrade_class_los) {
+        throw new Error('Lama upgrade kelas tidak boleh kosong')
+      }
+    }
+
+    state.birth_weight = isNaN(parseInt(state.birth_weight))
+      ? 0
+      : parseInt(state.birth_weight)
+    // === STEP 1: Set Claim ===
+    const mappedData = prepareKlaimData(state)
+    console.log("FINAL PAYLOAD SET_CLAIM >>>", mappedData)
+
+    const { data: setData, error: setError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify(mappedData),
+      }
+    )
+
+    if (setError.value) {
+      throw new Error(setError.value.data?.message || "Gagal set klaim")
+    }
+
+    console.log("RESPON SET_CLAIM >>>", setData.value)
+
+    // tampilkan form setelah klaim berhasil
+    showForm.value = true
+
+    // === STEP 2: Grouping ===
+
+    // 🔹 ambil diagnosa
+const diagnosaPayload = getCurrentDiagnosa().length
+  ? getCurrentDiagnosa().map((d) => d.kd_penyakit).join("#")
+  : "#"
+
+// prosedur sekarang via helper yang meng-handle multiplicity
+const prosedurPayload = getProsedurPayload()
+
+console.log('DEBUG => prosedurPayload', prosedurPayload)
+
+
+    const { data: groupData, error: groupError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/grouping`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          nomor_sep: sep.no_sep,
+          diagnosa: diagnosaPayload,
+          procedure: prosedurPayload,
+        }),
+      }
+    )
+
+    if (groupError.value) {
+      throw new Error(groupError.value.data?.message || "Gagal grouping")
+    }
+
+    console.log("RESPON GROUPING >>>", groupData.value)
+
+    const msg = groupData.value?.metadata ? groupData.value : groupData.value?.message
+    if (msg?.metadata?.code === 200) {
+      const res = msg.response_idrg
+      showGroupingResult.value = true
+      groupingData.jenisRawat = `${state.jenis_rawat === 1 ? 'Rawat Inap' : 'Rawat Jalan'} (${state.los} Hari)`
+      groupingData.mdc = res.mdc_description
+      groupingData.mdcCode = res.mdc_number
+      groupingData.drg = res.drg_description
+      groupingData.drgCode = res.drg_code
+      groupingData.status = "normal"
+    }
+
+    addToaster("Success", "Set klaim & grouping berhasil", "green", "i-tabler-discount-check-filled")
+
+    // refresh data klaim terakhir
+    refreshLatestKlaim()
+
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const final_res = ref<any>(null) // simpan hasil respon final
+
+const isFinalSuccess = computed(() => {
+  return final_res.value?.metadata?.code === 200
+})
+
+const finalGrouper = async () => {
+  isFinalLoading.value = true
+  try {
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silahkan cek kembali data pasien")
+    }
+
+    // === STEP: Final Grouper ===
+    const { data: finalData, error: finalError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/final`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          metadata: { method: "idrg_grouper_final" },
+          data: { nomor_sep: sep.no_sep },
+        }),
+      }
+    )
+
+    if (finalError.value) {
+      throw new Error(finalError.value.data?.message || "Gagal final grouper")
+    }
+
+    console.log("RESPON FINAL GROUPER >>>", finalData.value)
+
+      // simpan hasil ke state
+    final_res.value = finalData.value 
+      
+
+      // === VALIDASI JIKA FINAL BERHASIL ===
+    if (final_res.value?.metadata?.code === 200) {
+      showGroupingButton.value = false
+      showFinalButton.value = false
+      showEditUlangButton.value = true
+      showFormInacbg.value = true
+    }
+
+
+    addToaster("Success", "Final grouper berhasil", "green", "i-tabler-discount-check-filled")
+
+    // refresh data klaim terakhir
+    refreshLatestKlaim()
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
+  } finally {
+    isFinalLoading.value = false
+  }
+}
+
+const editUlangIdrg = async () => {
+  isReeditLoading.value = true
+  try {
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silahkan cek kembali data pasien")
+    }
+
+    const { data: reeditData, error: reeditError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/reedit`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          metadata: { method: "idrg_grouper_reedit" },
+          data: { nomor_sep: sep.no_sep },
+        }),
+      }
+    )
+
+    if (reeditError.value) {
+      throw new Error(reeditError.value.data?.message || "Gagal edit ulang IDRG")
+    }
+
+    console.log("RESPON REEDIT GROUPER >>>", reeditData.value)
+
+    addToaster("Success", "Edit ulang IDRG berhasil", "green", "i-tabler-discount-check-filled")
+
+    // setelah reedit, tampilkan lagi tombol Grouping & Final
+    showGroupingButton.value = true
+    showFinalButton.value = true
+    showEditUlangButton.value = false
+    showFormInacbg.value = false
+
+    // refresh data klaim
+    refreshLatestKlaim()
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
+  } finally {
+    isReeditLoading.value = false
+  }
+}
+
+
+const importIdrgToInacbg = async () => {
+  isImporting.value = true
+  try {
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silahkan cek kembali data pasien")
+    }
+
+    // Endpoint ini harus sesuai dengan yang Anda definisikan di backend
+    const { data: importData, error: importError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/import-idrg`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          metadata: { method: "idrg_to_inacbg_import" },
+          data: { nomor_sep: sep.no_sep },
+        }),
+      }
+    )
+
+    if (importError.value) {
+      throw new Error(importError.value.data?.message || "Gagal mengimpor data coding iDRG")
+    }
+
+    console.log("RESPON IMPORT CODING >>>", importData.value)
+
+    const response = importData.value;
+    if (response?.metadata?.code === 200 && response?.data) {
+      // Kosongkan data INACBG yang ada
+      diagnosaInacbg.value = []
+      prosedurInacbg.value = []
+
+      // Isi dengan data hasil import dari response API
+      const diagnosaData = response.data?.diagnosa?.expanded;
+      if (diagnosaData && Array.isArray(diagnosaData)) {
+        diagnosaInacbg.value = diagnosaData.map((dx: any) => ({
+          kd_penyakit: dx.code,
+          penyakit: {
+            kd_penyakit: dx.code,
+            nm_penyakit: dx.display,
+          },
+        }));
+      }
+
+      const prosedurData = response.data?.procedure?.expanded;
+      if (prosedurData && Array.isArray(prosedurData)) {
+        prosedurInacbg.value = prosedurData.map((px: any) => ({
+          kode: px.code,
+          penyakit: {
+            kode: px.code,
+            deskripsi_panjang: px.display,
+          },
+          // Jumlah default 1 karena tidak ada di response
+          jumlah: 1 
+        }));
+      }
+      
+      addToaster("Success", "Data coding iDRG berhasil diimpor", "green", "i-tabler-discount-check-filled")
+
+    } else {
+        throw new Error(response?.metadata?.message || "Respon impor tidak valid")
+    }
+
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
+  } finally {
+    isImporting.value = false
+  }
+}
+
+// Letakkan fungsi ini di dalam <script setup>, di dekat fungsi-fungsi lain seperti finalGrouper
+
+const groupingInacbg = async () => {
+  isInacbgGrouping.value = true
+  try {
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silahkan cek kembali data pasien")
+    }
+
+    // 1. Siapkan payload diagnosa dan prosedur dari state INACBG
+    const diagnosaPayload = diagnosaInacbg.value.length
+      ? diagnosaInacbg.value.map((d) => d.kd_penyakit).join("#")
+      : "#"
+
+    const prosedurPayload = prosedurInacbg.value.length
+      ? prosedurInacbg.value.map((p) => p.kode).join("#")
+      : "#"
+
+    // 2. Kirim request ke backend (endpoint baru untuk INACBG)
+    const { data: groupData, error: groupError } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/grouping-inacbg`, // Endpoint baru!
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          nomor_sep: sep.no_sep,
+          diagnosa: diagnosaPayload,
+          procedure: prosedurPayload,
+        }),
+      }
+    )
+
+    if (groupError.value) {
+      throw new Error(groupError.value.data?.message || "Gagal melakukan grouping INA-CBG")
+    }
+
+    console.log("RESPON GROUPING INACBG >>>", groupData.value)
+
+    // 3. Proses response dan tampilkan hasilnya
+    const response = groupData.value
+    // === PERBAIKAN DIMULAI DI SINI ===
+    if (response?.message?.metadata?.code === 200) { // DIUBAH: Akses ke dalam `message`
+      const cbgResult = response.message.response_inacbg; // DIUBAH: Akses ke `response_inacbg`
+      
+      showInacbgResult.value = true;
+      inacbgResultData.cbg = cbgResult.cbg.code;
+      inacbgResultData.cbg_desc = cbgResult.cbg.description;
+      inacbgResultData.total_tarif = `Rp ${new Intl.NumberFormat('id-ID').format(cbgResult.tariff)}`; // DIUBAH: Menggunakan `tariff`
+      inacbgResultData.kelas = cbgResult.kelas; // DIUBAH: Menggunakan `kelas`
+      inacbgResultData.versi = cbgResult.inacbg_version; // DIUBAH: Menggunakan `inacbg_version`
+      
+      addToaster("Success", "Grouping INA-CBG berhasil", "green", "i-tabler-discount-check-filled");
+    } else {
+      throw new Error(response?.message?.metadata?.message || "Gagal mendapatkan hasil grouping INA-CBG"); // DIUBAH: Pesan error dari API
+    }
+    
+    refreshLatestKlaim()
+
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled")
+  } finally {
+    isInacbgGrouping.value = false
+  }
+}
+
 
 function removeDiagnosa(index: number) {
   if (useDiagnosaLocal) {
@@ -461,6 +1014,77 @@ function getCurrentDiagnosa() {
   }
   return Array.isArray(diagnosa) ? diagnosa : []
 }
+
+function removeProsedur(index: number) {
+  if (useProcedureLocal) {
+    prosedurLocal.value.splice(index, 1)
+  } else if (Array.isArray(prosedur)) {
+    prosedur.splice(index, 1)
+  }
+}
+
+// helper: kembalikan array ter-normalisasi [{ kode, jumlah }]
+function normalizeProsedurEntries() {
+  // ambil current prosedur dari local / prop
+  let list = []
+  if (useProcedureLocal && Array.isArray(prosedurLocal.value) && prosedurLocal.value.length > 0) {
+    list = prosedurLocal.value
+  } else if (Array.isArray(prosedur)) {
+    list = prosedur
+  }
+
+  const normalized = []
+
+  for (const p of list) {
+    if (!p) continue
+
+    // kasus: FE bisa menyimpan objek atau string
+    // jika objek: coba ambil p.kode dan p.jumlah
+    if (typeof p === 'object') {
+      // jika kode sudah seperti "90.090+2", parse itu
+      const rawKode = p.kode ?? p.kd ?? p.value ?? null
+      if (!rawKode) continue
+
+      const m = String(rawKode).split('+')
+      const kode = m[0].trim()
+      const plusCount = m[1] ? parseInt(m[1], 10) : 0
+      const jumlahFromField = Number(p.jumlah) || 0
+
+      // jumlah effective: field jumlah (jika ada) OR parsed +count OR default 1
+      const jumlah = jumlahFromField > 0 ? jumlahFromField : (plusCount > 0 ? plusCount : 1)
+
+      if (kode) normalized.push({ kode, jumlah })
+    } else if (typeof p === 'string') {
+      // kalau string, bisa berupa "90.090+2" atau "90.090"
+      const m = p.split('+')
+      const kode = m[0].trim()
+      const jumlah = m[1] ? parseInt(m[1], 10) : 1
+      if (kode) normalized.push({ kode, jumlah })
+    }
+  }
+
+  return normalized
+}
+
+// helper: buat string payload "88.01#90.090+2" (atau "#" jika kosong)
+function getProsedurPayload() {
+  const normalized = normalizeProsedurEntries()
+  if (!normalized.length) return '#'
+
+  // hitung total per kode (tambah jumlah)
+  const counter: Record<string, number> = {}
+  normalized.forEach(({ kode, jumlah }) => {
+    counter[kode] = (counter[kode] || 0) + (Number(jumlah) || 1)
+  })
+
+  const parts = Object.entries(counter).map(([kode, count]) =>
+    count > 1 ? `${kode}+${count}` : kode
+  )
+
+  return parts.length ? parts.join('#') : '#'
+}
+
+
 
 
   
@@ -536,6 +1160,23 @@ function getCurrentDiagnosa() {
       openModalSync.value = false;
     }
   }
+
+  const addProsedur = (val: any) => {
+  const existing = prosedurLocal.value.find(p => p.kode === val.value)
+  if (existing) {
+    existing.jumlah += 1 // kalau udah ada, tambah jumlah
+  } else {
+    prosedurLocal.value.push({
+      kode: val.value,
+      penyakit: {
+        kode: val.value,
+        deskripsi_panjang: val.title
+      },
+      jumlah: 1
+    })
+  }
+}
+
 </script>
 
 <template>
@@ -844,13 +1485,13 @@ function getCurrentDiagnosa() {
   </div>
 </div>
 
-<div class="flex justify-end pt-4">
- <!-- Tombol Set Klaim -->
+<!-- Tombol Set Klaim -->
+<!-- <div class="flex justify-end pt-4">
 <UButton :disabled="loadingSetKlaim" @click="setKlaim">
   <span v-if="!loadingSetKlaim">Set Klaim</span>
   <span v-else>Loading...</span>
 </UButton>
-</div>
+</div> -->
 
 <div v-if="showForm">
   <!-- <UDivider label="Diagnosa dan Prosedur iDRG" /> -->
@@ -927,21 +1568,11 @@ function getCurrentDiagnosa() {
     
     <div class="flex flex-col lg:flex-row items-center justify-between">
       <h3 class="text-base font-semibold mb-2">Prosedur (<code>ICD-9-CM</code>):</h3>
-      <USelectMenu :key="diagnosaKey" class="w-full lg:w-[300px]" :searchable="fetchProsedurIdrg" :loading="loadingStates.idrgProsedur.value" :onChange="(val: any) => {
-        prosedur?.push({
-          kode: val.value,
-          penyakit: {
-            kode: val.value,
-            deskripsi_panjang: val.title
-          },
-          jumlah: 1 // Add this line to initialize quantity
-        })
-        // diagnosaKey++ 
-      }" searchable-placeholder="cari diagnosa ..." placeholder="cari prosedur idrg ..." />
+      <USelectMenu :key="diagnosaKey" class="w-full lg:w-[300px]" :searchable="fetchProsedurIdrg" :loading="loadingStates.idrgProsedur.value"  :onChange="(val: any) => addProsedur(val)" searchable-placeholder="cari diagnosa ..." placeholder="cari prosedur idrg ..." />
     </div>
     
-    <Sortable :list="prosedur ?? []" item-key="id" tag="div"
-    @end="(event) => moveItemInArray(prosedur ?? [], event.oldIndex, event.newIndex)">
+    <Sortable :list="prosedurLocal ?? []" item-key="id" tag="div"
+    @end="(event) => moveItemInArray(prosedurLocal ?? [], event.oldIndex, event.newIndex)">
     <template #item="{ element, index }">
       <div
       class="draggable mb-2 flex items-center justify-between gap-3 p-2 border rounded-xl border-cool-300 dark:border-cool-700"
@@ -961,7 +1592,7 @@ function getCurrentDiagnosa() {
           />
         </div>
         
-        <UButton variant="soft" color="red" @click="prosedur?.splice(index, 1)"
+        <UButton variant="soft" color="red" @click="removeProsedur(index)"
         icon="i-tabler-x" />
       </div>
     </div>
@@ -969,10 +1600,11 @@ function getCurrentDiagnosa() {
 </Sortable>
 <div class="flex justify-end pt-4">
   <UButton
+  v-if="showGroupingButton"
   color="blue"
   icon="i-tabler-hierarchy-2"
   :loading="isLoading"
-  @click="groupingDiagnosaSet"
+  @click="saveAndGroupingKlaim"
 >
   Grouping
 </UButton>
@@ -1019,9 +1651,28 @@ function getCurrentDiagnosa() {
   <div class="flex justify-end gap-3 pt-5">
   
 
-  <UButton color="lime" type="button" icon="i-tabler-checkbox" @click="finalKlaim">
-    Final
+  <!-- <template> -->
+  <UButton
+  v-if="showFinalButton"
+    color="green"
+    icon="i-tabler-check"
+    :loading="isFinalLoading"
+    @click="finalGrouper"
+  >
+    Final IDRG
   </UButton>
+
+   <!-- Edit Ulang IDRG -->
+  <UButton
+  v-if="showEditUlangButton"
+    color="orange"
+    icon="i-tabler-edit"
+    :loading="isReeditLoading"
+    @click="editUlangIdrg"
+  >
+    Edit Ulang IDRG
+  </UButton>
+<!-- </template> -->
 </div>
 </div>
 </div>
@@ -1029,6 +1680,7 @@ function getCurrentDiagnosa() {
 </UTabs>
 </div>
 <!-- <UDivider label="Diagnosa dan Prosedur INACBG" /> -->
+<div v-if="showFormInacbg">
 
 <UTabs :items="[{ key: 'coding_unu', label: 'Coding INACBG' }]" class="w-full">
   <template #default="{ item, index, selected }">
@@ -1106,10 +1758,64 @@ function getCurrentDiagnosa() {
   </template>
 </Sortable>
 
+<div class="flex justify-end gap-3 pt-4">
+    <UButton
+      color="gray"
+      variant="outline"
+      icon="i-tabler-database-import"
+      @click="importIdrgToInacbg"
+      :loading="isImporting"
+      >
+      Import Coding
+    </UButton>
+     <UButton
+      color="blue"
+      icon="i-tabler-hierarchy-2"
+      @click="groupingInacbg" 
+      :loading="isInacbgGrouping"
+      >
+      Grouping
+    </UButton>
+  </div>
+
+  <div v-if="showInacbgResult" class="mt-8 border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
+  <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
+      <thead class="bg-gray-100 dark:bg-gray-800">
+          <tr>
+              <th colspan="2" class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  Hasil Grouping INA-CBG ({{ inacbgResultData.versi }})
+              </th>
+          </tr>
+      </thead>
+      <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+          <tr>
+              <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/4">Kelas</td>
+              <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
+                  {{ inacbgResultData.kelas }}
+              </td>
+          </tr>
+          <tr>
+              <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium">CBG</td>
+              <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
+                  {{ inacbgResultData.cbg_desc }} 
+                  <span class="float-right font-mono">{{ inacbgResultData.cbg }}</span>
+              </td>
+          </tr>
+          <tr>
+              <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium">Total Tarif</td>
+              <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 font-semibold">
+                  {{ inacbgResultData.total_tarif }}
+              </td>
+          </tr>
+      </tbody>
+  </table>
+</div>
+
 </div>
 </div>
 </template>
 </UTabs>
+</div>
 
 <UDivider label="Data Klinis" />
 

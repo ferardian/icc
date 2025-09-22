@@ -64,11 +64,11 @@ async function fetchHelper(query: string, endpoint: string, loader: any) {
 }
 
 // === Wrappers ===
-export async function fetchDiagnosaUnu(query: string) {
-  return fetchHelper(query, '/icd10_im', loadingStates.unuDiagnosa)
+export async function fetchDiagnosaInacbgLokal(query: string) {
+  return fetchHelper(query, '/icd10_inacbg', loadingStates.unuDiagnosa)
 }
-export async function fetchProsedurUnu(query: string) {
-  return fetchHelper(query, '/icd9_im', loadingStates.unuProsedur)
+export async function fetchProsedurInacbgLokal(query: string) {
+  return fetchHelper(query, '/icd9_inacbg', loadingStates.unuProsedur)
 }
 export async function fetchDiagnosaIdrg(query: string) {
   return fetchHelper(query, '/icd10_idrg', loadingStates.idrgDiagnosa)
