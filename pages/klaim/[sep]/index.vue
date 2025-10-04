@@ -53,7 +53,7 @@
 
     <template v-if="klaimData?.data">
       <UCard class="mb-5">
-        <template #header>
+        <!-- <template #header>
           <div class="w-full flex items-center justify-between">
             <h2 class="text-lg font-semibold text-indigo-500">Hasil Klaim Terakhir</h2>
 
@@ -61,10 +61,10 @@
               <UButton icon="i-heroicons-pencil-square" size="sm" color="yellow" variant="ghost" label="Edit Detail Naik Kelas" @click="openUpdateNaikKelas = true" :trailing="false"/>
             </template>
           </div>
-        </template>
+        </template> -->
 
         <!-- show 3 information, code cbg, deskripsi dan tarif -->
-        <div class="flex flex-col xl:flex-row gap-5 items-stretch">
+        <!-- <div class="flex flex-col xl:flex-row gap-5 items-stretch">
           <div class="">
             <h3 class="text-sm font-semibold text-indigo-500 mb-1">CBG</h3>
             <UBadge color="sky" variant="subtle" class="text-sm">
@@ -79,7 +79,7 @@
             <h3 class="text-sm font-semibold text-indigo-500 mb-1">Tarif</h3>
             <p>{{ klaimData?.data?.tarif ? formatRupiah(klaimData?.data?.tarif) : '-' }}</p>
           </div>
-        </div>
+        </div> -->
 
         <template v-if="isVip && totalTarifRs && totalTarifRs < klaimData?.data?.tarif">
           <UDivider class="my-5" label="Tambahan Biaya" />
