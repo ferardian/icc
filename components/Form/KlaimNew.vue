@@ -209,7 +209,7 @@ if (dpjp.value?.data && Array.isArray(dpjp.value.data) && dpjp.value.data.length
     discharge_status: parseInt(`${sep?.jnspelayanan}`) == 1 ? ((await getCaraPulangByLabel(kamarInap?.detail?.[0]?.stts_pulang)).value ?? null) : 1,
     nama_dokter: '',
     kd_dokter: '',
-    kode_tarif: "CP",
+    kode_tarif: "CS",
     co_insidence_ind_jkn: false,
     upgrade_class_class: determineKelas(sep?.klsnaik)?.value,
     upgrade_class_payor: sep?.pembiayaan ?? undefined,
