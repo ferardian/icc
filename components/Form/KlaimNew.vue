@@ -1511,6 +1511,7 @@ const groupingInacbg = async () => {
           nomor_sep: sep.no_sep,
           diagnosa: diagnosaPayload,
           procedure: prosedurPayload,
+          jenis_rawat: state.jenis_rawat,
         }),
       }
     )

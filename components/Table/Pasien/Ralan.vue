@@ -19,6 +19,7 @@ const openModalLoading = ref(false)
 const openModalKlaimFeedback = ref(false)
 
 const buildUrl = (noRawat: string) => `/sep/${btoa(noRawat)}`
+const buildUrlErm = (noRawat: string) => `/erm/${btoa(noRawat)}`
 const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
 
 const virtualElement = ref({ getBoundingClientRect: () => ({}) })
@@ -126,6 +127,13 @@ const rowMenu = (row: any) => {
         openDokumen.value = true;
         pdfReady.value = false;
         sep.value = row.no_sep
+      }
+    },{
+      label: 'ERM BPJS',
+      icon: 'i-tabler-pig-money',
+      disabled: !row?.pasien?.no_rkm_medis,
+      click: () => {
+        openNewTab(buildUrlErm(row.pasien?.no_rkm_medis));
       }
     }],
     [{
