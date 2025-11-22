@@ -115,7 +115,13 @@
             <div class="flex gap-1 mt-1">
               <UBadge size="xs" color="gray">{{ row.pasien?.no_rkm_medis ?? "-" }}</UBadge>
               <span class="text-gray-500 font-semibold text-sm px-1">|</span>
-              <span class="text-gray-500 font-semibold text-sm">{{ row.sum_lama }} Hari</span>
+              <span class="text-gray-500 font-semibold text-sm">
+              {{ 
+                (row.tgl_keluar === '0000-00-00' || !row.tgl_keluar) 
+                ? hitungLamaHari(row.reg_periksa_simple?.tgl_registrasi) 
+                : row.sum_lama 
+              }} Hari
+            </span>
               <template v-if="row.sep_simple?.berkas_perawatan">
                 <span class="text-gray-500 font-semibold text-sm px-1">|</span>
                 <UTooltip text="Berkas Terkirim" :popper="{ placement: 'top' }"
@@ -139,6 +145,11 @@
               <UBadge variant="subtle" si color="purple" class="w-fit">
                 <p class="truncate text-xs text-ellipsis whitespace-nowrap overflow-hidden">
                   {{ row.reg_periksa_simple?.poliklinik?.nm_poli ?? "-" }}
+                </p>
+              </UBadge>
+              <UBadge variant="subtle" color="teal" class="w-fit">
+                <p class="truncate text-xs text-ellipsis whitespace-nowrap overflow-hidden">
+                  Kelas {{ row.sep_simple?.klsrawat ?? " -" }}
                 </p>
               </UBadge>
             </div>
@@ -451,7 +462,7 @@
 import type { GroupingCostRawatInap, OrionFilterInterface, RealCostRawatInap, ResourcePagination } from '~/types'
 import { pasienRanapColumns } from '~/common/data/columns'
 import { useClipboard, useDebounceFn } from '@vueuse/core'
-import { format } from 'date-fns'
+import { format, differenceInDays } from 'date-fns'
 import { determineStatus } from '~/common/helpers/statusHelper';
 import { setStatus } from '~/common/helpers/statusHelper';
 
@@ -499,6 +510,22 @@ function contextmenu(event: MouseEvent, row: any) {
   })
 
   contextMenuRow.value = row
+}
+
+const hitungLamaHari = (tglMasuk: string | undefined): number => {
+  // Jika tanggal masuk tidak ada, kembalikan 0
+  if (!tglMasuk) {
+    return 0;
+  }
+
+  const tanggalMasuk = new Date(tglMasuk);
+  const hariIni = new Date();
+
+  // Hitung selisih hari, tambahkan 1 karena hari pertama dihitung
+  const lamaInap = differenceInDays(hariIni, tanggalMasuk) + 1;
+
+  // Pastikan hasilnya minimal 1 hari
+  return lamaInap > 0 ? lamaInap : 1;
 }
 
 const doExportBerkas = async () => {

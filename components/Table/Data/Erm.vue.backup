@@ -1,0 +1,5127 @@
+<template>
+  <UCard>
+    <template #header>
+      <div class="flex items-center justify-between">
+        <div class="flex items-start gap-4">
+          <UButton icon="i-tabler-moneybag" variant="soft" color="sky" square />
+          <div>
+            <h3 class="text-lg text-sky-500 font-semibold">ERM BPJS</h3>
+            <p class="text-sm text-cool-500">Data riwayat klaim pasien</p>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- TAB: Riwayat Pemeriksaan & Coding -->
+    <div class="space-y-4">
+      <!-- Patient Info Header -->
+      <div v-if="data?.data && data.data.length > 0" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
+        <div class="flex items-center gap-3">
+          <UIcon name="i-tabler-user" class="w-8 h-8 text-blue-500" />
+          <div>
+            <h3 class="font-semibold text-lg">{{ data?.data[0]?.nama_pasien }}</h3>
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+              <span>No. RM: {{ data?.data[0]?.nomr }}</span>
+              <span class="mx-2">|</span>
+              <span>No. Kartu: {{ data?.data[0]?.no_kartu }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Controls -->
+      <div class="flex justify-between items-center">
+        <h3 class="text-lg font-semibold">Riwayat Pemeriksaan & Coding SNOMED</h3>
+        <div class="flex gap-2">
+          <USelectMenu
+            v-model="viewFilter"
+            :options="viewFilterOptions"
+            placeholder="Filter Tampilan"
+          />
+          <USelectMenu
+            v-if="viewFilter === 'coding'"
+            v-model="codingStatusFilter"
+            :options="codingStatusOptions"
+            placeholder="Filter Status Coding"
+            @update:model-value="fetchCodingQueue"
+          />
+        </div>
+      </div>
+      <!-- Error State -->
+      <div v-if="status === 'error'" class="p-6 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+        <div class="flex items-center gap-4">
+          <UIcon name="i-tabler-alert-circle" class="w-8 h-8 text-red-500" />
+          <div>
+            <h3 class="font-semibold text-red-800 dark:text-red-200">Terjadi Kesalahan</h3>
+            <p class="text-red-600 dark:text-red-300 text-sm">Gagal memuat data. Backend error: Call to undefined method App\Models\BridgingSep::regPeriksa()</p>
+            <p class="text-red-500 dark:text-red-400 text-xs mt-1">Silakan hubungi administrator untuk memperbaiki masalah ini.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-else-if="pending" class="p-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-center gap-4">
+          <UProgress animation="carousel" />
+          <span class="text-gray-600 dark:text-gray-300">Memuat data...</span>
+        </div>
+      </div>
+
+      <!-- Data Not Available -->
+      <div v-else-if="!hasAnyData" class="p-6 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800">
+        <div class="flex items-center gap-4">
+          <UIcon name="i-tabler-info-circle" class="w-8 h-8 text-yellow-500" />
+          <div>
+            <h3 class="font-semibold text-yellow-800 dark:text-yellow-200">Data Tidak Tersedia</h3>
+            <p class="text-yellow-600 dark:text-yellow-300 text-sm">Tidak ada data riwayat pemeriksaan yang ditemukan untuk pasien ini.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unified Table -->
+      <div v-else>
+        <!-- Riwayat Klaim Table -->
+        <div v-if="viewFilter === 'riwayat'">
+          <UTable
+            :rows="data?.data || []"
+            :columns="riwayatColumns"
+            :loading="pending"
+            :empty-state="{ icon: 'i-heroicons-circle-stack-20-solid', label: 'Belum ada riwayat klaim.' }"
+            @select="handleRowClick"
+          >
+            <template #status_klaim-data="{ row }">
+              <UBadge :label="row.status_klaim" :color="row.status_klaim === 'Belum' ? 'yellow' : row.status_klaim === 'Sudah' ? 'green' : row.status_klaim === 'Pending' ? 'orange' : 'rose'" variant="soft" />
+            </template>
+            <template #no_sep-data="{ row }">
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-sm">{{ row.no_sep }}</span>
+                <UButton @click="copyToClipboard(row.no_sep)" variant="link" color="sky" size="xs" icon="i-tabler-copy" />
+              </div>
+            </template>
+            <template #jnspelayanan-data="{ row }">
+              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            </template>
+            <template #tgl_masuk-data="{ row }">
+              <div>
+                {{ new Date(row.reg_periksa?.tgl_registrasi).toLocaleDateString('id-ID', {
+                  weekday: 'short', year: 'numeric',
+                  month: 'short', day: 'numeric'
+                }) }}
+                <div class="text-xs text-gray-500">
+                  {{ row.reg_periksa?.jam_reg }} WIB
+                </div>
+              </div>
+            </template>
+            <template #tgl_keluar-data="{ row }">
+              <div v-if="row?.tanggal_pulang && (row?.tanggal_pulang?.tgl_keluar != '0000-00-00' || row?.tanggal_pulang?.jam_keluar != '00:00:00')">
+                {{ new Date(row?.tanggal_pulang?.tgl_keluar).toLocaleDateString('id-ID', {
+                  weekday: 'short', year: 'numeric',
+                  month: 'short', day: 'numeric'
+                }) }}
+                <div class="text-xs text-gray-500">
+                  {{ row?.tanggal_pulang?.jam_keluar }} WIB
+                </div>
+              </div>
+              <div v-else>-</div>
+            </template>
+            <template #cbg-data="{ row }">
+              <UBadge variant="soft" size="sm" class="w-min" :color="row.group_stage?.code_cbg?.startsWith('X-') ? 'rose' : 'fuchsia'">
+                {{ row.group_stage?.code_cbg }}
+              </UBadge>
+            </template>
+            <template #tarif-data="{ row }">
+              <template v-if="row.group_stage">
+                <span class="text-violet-400 font-semibold">
+                  {{ new Intl.NumberFormat('id-ID', {
+                    style: 'currency', currency: 'IDR', maximumFractionDigits: 0
+                  }).format(row.group_stage?.tarif) }}
+                </span>
+              </template>
+              <template v-else>-</template>
+            </template>
+            <template #status_klaim_kemkes-data="{ row }">
+              <template v-if="row.rsia_klaim_idrg && row.rsia_klaim_idrg.send_klaim_res">
+                <template v-if="getKemkesStatus(row.rsia_klaim_idrg.send_klaim_res)">
+                  <UBadge
+                    variant="soft"
+                    size="sm"
+                    class="w-min"
+                    :color="getKemkesStatus(row.rsia_klaim_idrg.send_klaim_res) === 'sent' ? 'green' : (getKemkesStatus(row.rsia_klaim_idrg.send_klaim_res) === 'unsent' ? 'yellow' : 'gray')"
+                  >
+                    {{ getKemkesStatus(row.rsia_klaim_idrg.send_klaim_res) }}
+                  </UBadge>
+                </template>
+                <template v-else>-</template>
+              </template>
+              <template v-else>-</template>
+            </template>
+            <template #actions-data="{ row }">
+              <div class="flex gap-2">
+                <UButton icon="i-tabler-file-download" label="PDF" color="emerald" @click="$emit('download-pdf', row.no_rawat)" size="xs" />
+                <UButton icon="i-tabler-refresh" label="Sync" color="sky" @click="$emit('open-modal-sync', row)" size="xs"/>
+              </div>
+            </template>
+          </UTable>
+        </div>
+
+        <!-- Coding Table -->
+        <div v-else-if="viewFilter === 'coding'">
+          <UTable
+            :rows="codingQueue"
+            :columns="codingColumns"
+            :loading="loadingCodingQueue"
+            :empty-state="{
+              icon: 'i-heroicons-queue-list',
+              label: 'Tidak ada kunjungan yang perlu di-coding'
+            }"
+            @select="handleCodingRowClick"
+          >
+            <template #no_sep-data="{ row }">
+              <span class="font-mono text-sm">{{ row.no_sep }}</span>
+            </template>
+
+            <template #no_rawat-data="{ row }">
+              <span class="font-mono text-xs">{{ row.no_rawat }}</span>
+            </template>
+
+            <template #tgl_kunjungan-data="{ row }">
+              {{ new Date(row.tglsep).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
+            </template>
+
+            <template #jenis_data="{ row }">
+              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            </template>
+
+            <template #poliklinik-data="{ row }">
+              <span class="text-sm">{{ row.reg_periksa?.poliklinik?.nm_poli || '-' }}</span>
+            </template>
+
+            <template #dokter-data="{ row }">
+              <span class="text-sm">{{ row.reg_periksa?.dokter?.nm_dokter || '-' }}</span>
+            </template>
+
+            <template #coding_status-data="{ row }">
+              <UBadge
+                :label="getCodingStatusLabel(row)"
+                :color="getCodingStatusColor(row)"
+                variant="soft"
+              />
+            </template>
+
+            <template #actions-data="{ row }">
+              <UButton
+                icon="i-tabler-code"
+                label="Coding"
+                color="blue"
+                size="xs"
+                @click="handleCodingRowClick(row)"
+              />
+            </template>
+          </UTable>
+        </div>
+
+        <!-- Combined View -->
+        <div v-else-if="viewFilter === 'combined'">
+          <UTable
+            :rows="combinedTableData"
+            :columns="combinedColumns"
+            :loading="pending || loadingCodingQueue"
+            :empty-state="{
+              icon: 'i-heroicons-circle-stack-20-solid',
+              label: 'Belum ada data riwayat pemeriksaan'
+            }"
+            @select="handleCombinedRowClick"
+          >
+            <template #no_sep-data="{ row }">
+              <div class="flex items-center gap-1">
+                <span class="font-mono text-sm">{{ row.no_sep }}</span>
+                <UButton @click="copyToClipboard(row.no_sep)" variant="link" color="sky" size="xs" icon="i-tabler-copy" />
+              </div>
+            </template>
+
+            <template #no_rawat-data="{ row }">
+              <span class="font-mono text-xs">{{ row.no_rawat }}</span>
+            </template>
+
+            <template #jenis_data="{ row }">
+              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            </template>
+
+            <template #poliklinik-data="{ row }">
+              <span class="text-sm">{{ row.reg_periksa?.poliklinik?.nm_poli || row.poliklinik || '-' }}</span>
+            </template>
+
+            <template #dokter-data="{ row }">
+              <span class="text-sm">{{ row.reg_periksa?.dokter?.nm_dokter || row.dokter || '-' }}</span>
+            </template>
+
+            <template #status_klaim-data="{ row }">
+                  <ClientOnly>
+                    <UBadge
+                      variant="soft"
+                      size="sm"
+                      class="w-min"
+                      :label="getKlaimStatus(row)"
+                      :class="{
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': getKlaimStatus(row).toLowerCase() === 'sent',
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': getKlaimStatus(row).toLowerCase() !== 'sent'
+                      }"
+                    />
+                  </ClientOnly>
+            </template>
+
+            <template #coding_status-data="{ row }">
+              <UBadge
+                :label="getCodingStatusLabel(row)"
+                :color="getCodingStatusColor(row)"
+                variant="soft"
+              />
+            </template>
+
+            <template #actions-data="{ row }">
+              <div class="flex gap-2">
+             
+                <UButton
+                  v-if="row.hasClaim"
+                  icon="i-tabler-file-text"
+                  label="Detail"
+                  color="emerald"
+                  size="xs"
+                  @click="handleRowClick(row)"
+                />
+                
+              </div>
+            </template>
+          </UTable>
+        </div>
+      </div>
+    </div>
+
+  
+    <!-- Empty State for Detail -->
+    <div v-if="!selectedVisitData" class="mt-6 text-center text-gray-500 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+      <UIcon name="i-tabler-file-text" class="w-8 h-8 mx-auto mb-2 text-gray-400" />
+      <p>Klik salah satu baris riwayat di atas untuk melihat detail pemeriksaan.</p>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- DETAIL PEMERIKSAAN SECTION (NO MODAL)   -->
+    <!-- ========================================= -->
+    <div v-if="selectedVisitData" class="mt-8 space-y-6">
+      <!-- Header Detail -->
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
+        <div class="flex justify-between items-start">
+          <div class="flex-1">
+            <h3 class="text-xl font-bold mb-3">Detail Pemeriksaan & Coding SNOMED</h3>
+
+            <!-- Status Klaim Section -->
+            <div class="mb-3">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-sm font-medium">Status Klaim Kemenkes:</span>
+                <UBadge
+                  :label="getKlaimStatusBadge(selectedVisitData)"
+                  :color="getKlaimStatusColor(selectedVisitData) as any"
+                  variant="soft"
+                  size="sm"
+                />
+              </div>
+              <div v-if="getKlaimStatus(selectedVisitData) === 'sent'" class="text-xs text-blue-100">
+                ✓ Detail ERM tersedia untuk ditinjau dan coding
+              </div>
+              <div v-else class="text-xs text-yellow-100">
+                ⚠ Detail ERM hanya tersedia jika status klaim sudah "sent"
+              </div>
+            </div>
+
+            <!-- Visit Info -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <span class="opacity-75">No. Rawat:</span>
+                <span class="ml-2 font-semibold">{{ selectedVisitData.no_rawat }}</span>
+              </div>
+              <div>
+                <span class="opacity-75">No. SEP:</span>
+                <span class="ml-2 font-semibold">{{ selectedVisitData.no_sep }}</span>
+              </div>
+              <div>
+                <span class="opacity-75">Tgl Kunjungan:</span>
+                <span class="ml-2 font-semibold">{{ new Date(selectedVisitData.tglsep).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}</span>
+              </div>
+              <div>
+                <span class="opacity-75">Jenis:</span>
+                <span class="ml-2 font-semibold">{{ selectedVisitData.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+              </div>
+            </div>
+          </div>
+
+          </div>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loadingVisitDetails" class="flex justify-center items-center py-12">
+        <UIcon name="i-tabler-loader-2" class="animate-spin text-3xl mr-3 text-blue-500" />
+        <span class="text-gray-600">Memuat detail pemeriksaan...</span>
+      </div>
+
+      <!-- Detail Content -->
+      <div v-else-if="visitDetails" class="space-y-6">
+
+        <!-- DIAGNOSA ICD-10 -->
+        <div v-if="visitDetails.diagnosa && visitDetails.diagnosa.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-red-50 dark:bg-red-900/20 px-6 py-4 rounded-t-xl border-b border-red-200 dark:border-red-800">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-stethoscope" class="w-5 h-5 text-red-600 dark:text-red-400" />
+              <h4 class="font-semibold text-red-800 dark:text-red-200">Diagnosa ICD-10</h4>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="(diag, index) in visitDetails.diagnosa" :key="`diag-${index}`" class="flex items-start gap-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-lg">
+                <UBadge :label="diag.status === 'Utama' ? 'Utama' : 'Tambahan'" :color="diag.status === 'Utama' ? 'red' : 'orange'" variant="soft" />
+                <div class="flex-1">
+                  <p class="font-semibold text-red-800 dark:text-red-200">[{{ diag.kode }}]</p>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ diag.deskripsi }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PROSEDUR ICD-9 -->
+        <div v-if="visitDetails.prosedur && visitDetails.prosedur.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 rounded-t-xl border-b border-green-200 dark:border-green-800">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-activity-heartbeat" class="w-5 h-5 text-green-600 dark:text-green-400" />
+              <h4 class="font-semibold text-green-800 dark:text-green-200">Prosedur ICD-9</h4>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-for="(proc, index) in visitDetails.prosedur" :key="`proc-${index}`" class="p-3 bg-green-50 dark:bg-green-900/10 rounded-lg">
+                <p class="font-semibold text-green-800 dark:text-green-200">[{{ proc.kode }}]</p>
+                <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ proc.deskripsi }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PEMERIKSAAN RAWAT JALAN (SOAP) DENGAN SNOMED CODING -->
+        <div v-if="visitDetails.cppt_pemeriksaan_ralan && visitDetails.cppt_pemeriksaan_ralan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-blue-50 dark:bg-blue-900/20 px-6 py-4 rounded-t-xl border-b border-blue-200 dark:border-blue-800">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-tabler-notes" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h4 class="font-semibold text-blue-800 dark:text-blue-200">Pemeriksaan Rawat Jalan (SOAP)</h4>
+              </div>
+              <UButton
+                icon="i-tabler-search"
+                label="Cari SNOMED"
+                color="blue"
+                size="sm"
+                @click="toggleSNOMEDSearch"
+              />
+            </div>
+          </div>
+
+          <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            <div v-for="(soap, index) in visitDetails.cppt_pemeriksaan_ralan" :key="`soap-${index}`" class="p-6 space-y-4">
+
+              <!-- Header SOAP -->
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">
+                    {{ new Date(`${soap.tgl_perawatan} ${soap.jam_rawat}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }}
+                  </p>
+                  <p class="text-sm text-gray-500">Oleh: {{ soap.nip }}</p>
+                  <p class="text-xs text-gray-400">No. Rawat: {{ soap.no_rawat }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <UBadge
+                    :label="getMappedCountForSOAP(soap) > 0 ? `${getMappedCountForSOAP(soap)} mapped` : 'No mapping'"
+                    :color="getMappedCountForSOAP(soap) > 0 ? 'green' : 'gray'"
+                    variant="soft"
+                    size="xs"
+                  />
+                  <!-- Debug info (hanya muncul di development) -->
+                  <UBadge
+                    v-if="soapMappings.length > 0"
+                    :label="`${soapMappings.length} total`"
+                    color="blue"
+                    variant="outline"
+                    size="xs"
+                  />
+                </div>
+              </div>
+
+              <!-- S (Subjektif) -->
+              <div v-if="soap.keluhan" class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <UBadge label="S" color="orange" variant="soft" size="xs" />
+                  <span class="font-semibold text-sm">Keluhan (Subjektif)</span>
+                  <UButton
+                    icon="i-tabler-plus"
+                    size="2xs"
+                    color="blue"
+                    variant="soft"
+                    @click="openAddMappingForSOAP(soap, 'keluhan')"
+                  />
+                </div>
+                <div class="ml-6 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <p class="text-sm">{{ soap.keluhan }}</p>
+                  <div v-if="getSOAPMappings(soap, 'keluhan').length > 0" class="mt-3 space-y-2">
+                    <div v-for="(mapping, mIdx) in getSOAPMappings(soap, 'keluhan')" :key="`keluhan-${mIdx}`" class="flex items-start gap-2 p-2 bg-orange-100 dark:bg-orange-900/30 rounded text-xs">
+                      <UIcon name="i-tabler-arrow-right" class="mt-1 text-orange-500" />
+                      <div class="flex-1">
+                        <p class="font-medium">"{{ mapping.source_text }}" → {{ mapping.snomed_term }}</p>
+                        <p class="text-xs text-gray-500">SNOMED: {{ mapping.snomed_concept_id }} | Type: {{ mapping.concept_type }}</p>
+                      </div>
+                      <UButton
+                        icon="i-tabler-trash"
+                        size="2xs"
+                        color="red"
+                        variant="ghost"
+                        @click="removeMappingFromList(mapping, mIdx)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- O (Objektif) -->
+              <div v-if="soap.pemeriksaan" class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <UBadge label="O" color="green" variant="soft" size="xs" />
+                  <span class="font-semibold text-sm">Pemeriksaan (Objektif)</span>
+                  <UButton
+                    icon="i-tabler-plus"
+                    size="2xs"
+                    color="blue"
+                    variant="soft"
+                    @click="openAddMappingForSOAP(soap, 'pemeriksaan')"
+                  />
+                </div>
+                <div class="ml-6 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p class="text-sm">{{ soap.pemeriksaan }}</p>
+                  <div v-if="getSOAPMappings(soap, 'pemeriksaan').length > 0" class="mt-3 space-y-2">
+                    <div v-for="(mapping, mIdx) in getSOAPMappings(soap, 'pemeriksaan')" :key="`pemeriksaan-${mIdx}`" class="flex items-start gap-2 p-2 bg-green-100 dark:bg-green-900/30 rounded text-xs">
+                      <UIcon name="i-tabler-arrow-right" class="mt-1 text-green-500" />
+                      <div class="flex-1">
+                        <p class="font-medium">"{{ mapping.source_text }}" → {{ mapping.snomed_term }}</p>
+                        <p class="text-xs text-gray-500">SNOMED: {{ mapping.snomed_concept_id }} | Type: {{ mapping.concept_type }}</p>
+                      </div>
+                      <UButton
+                        icon="i-tabler-trash"
+                        size="2xs"
+                        color="red"
+                        variant="ghost"
+                        @click="removeMappingFromList(mapping, mIdx)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- A (Assessment) -->
+              <div v-if="soap.penilaian" class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <UBadge label="A" color="purple" variant="soft" size="xs" />
+                  <span class="font-semibold text-sm">Penilaian (Assessment)</span>
+                  <UButton
+                    icon="i-tabler-plus"
+                    size="2xs"
+                    color="blue"
+                    variant="soft"
+                    @click="openAddMappingForSOAP(soap, 'penilaian')"
+                  />
+                </div>
+                <div class="ml-6 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <p class="text-sm">{{ soap.penilaian }}</p>
+                  <div v-if="getSOAPMappings(soap, 'penilaian').length > 0" class="mt-3 space-y-2">
+                    <div v-for="(mapping, mIdx) in getSOAPMappings(soap, 'penilaian')" :key="`penilaian-${mIdx}`" class="flex items-start gap-2 p-2 bg-purple-100 dark:bg-purple-900/30 rounded text-xs">
+                      <UIcon name="i-tabler-arrow-right" class="mt-1 text-purple-500" />
+                      <div class="flex-1">
+                        <p class="font-medium">"{{ mapping.source_text }}" → {{ mapping.snomed_term }}</p>
+                        <p class="text-xs text-gray-500">SNOMED: {{ mapping.snomed_concept_id }} | Type: {{ mapping.concept_type }}</p>
+                      </div>
+                      <UButton
+                        icon="i-tabler-trash"
+                        size="2xs"
+                        color="red"
+                        variant="ghost"
+                        @click="removeMappingFromList(mapping, mIdx)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- P (Plan) -->
+              <div v-if="soap.rtl" class="space-y-2">
+                <div class="flex items-center gap-2">
+                  <UBadge label="P" color="cyan" variant="soft" size="xs" />
+                  <span class="font-semibold text-sm">Plan (RTL)</span>
+                  <UButton
+                    icon="i-tabler-plus"
+                    size="2xs"
+                    color="blue"
+                    variant="soft"
+                    @click="openAddMappingForSOAP(soap, 'rtl')"
+                  />
+                </div>
+                <div class="ml-6 p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+                  <p class="text-sm">{{ soap.rtl }}</p>
+                  <div v-if="getSOAPMappings(soap, 'rtl').length > 0" class="mt-3 space-y-2">
+                    <div v-for="(mapping, mIdx) in getSOAPMappings(soap, 'rtl')" :key="`rtl-${mIdx}`" class="flex items-start gap-2 p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded text-xs">
+                      <UIcon name="i-tabler-arrow-right" class="mt-1 text-cyan-500" />
+                      <div class="flex-1">
+                        <p class="font-medium">"{{ mapping.source_text }}" → {{ mapping.snomed_term }}</p>
+                        <p class="text-xs text-gray-500">SNOMED: {{ mapping.snomed_concept_id }} | Type: {{ mapping.concept_type }}</p>
+                      </div>
+                      <UButton
+                        icon="i-tabler-trash"
+                        size="2xs"
+                        color="red"
+                        variant="ghost"
+                        @click="removeMappingFromList(mapping, mIdx)"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Debug Info Section (Development Only) -->
+              <div v-if="soapMappings.length > 0" class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-xs">
+                <div class="flex items-center gap-2 mb-2">
+                  <UIcon name="i-tabler-bug" class="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                  <span class="font-semibold text-gray-700 dark:text-gray-300">Debug Info</span>
+                  <UBadge label="Check Console" color="orange" variant="soft" size="2xs" />
+                </div>
+                <div class="space-y-1 text-gray-600 dark:text-gray-400">
+                  <p>Total SOAP mappings loaded: {{ soapMappings.length }}</p>
+                  <p>Current SOAP: {{ soap.no_rawat }} | {{ soap.tgl_perawatan }} {{ soap.jam_rawat }}</p>
+                  <div v-for="(field, fieldName) in { keluhan: soap.keluhan, pemeriksaan: soap.pemeriksaan, penilaian: soap.penilaian, rtl: soap.rtl }" :key="fieldName">
+                    <p v-if="field" class="flex items-center gap-2">
+                      <span>{{ fieldName }}:</span>
+                      <UBadge
+                        :label="`${getSOAPMappings(soap, fieldName).length} mappings`"
+                        :color="getSOAPMappings(soap, fieldName).length > 0 ? 'green' : 'red'"
+                        variant="soft"
+                        size="2xs"
+                      />
+                    </p>
+                  </div>
+                  <div class="mt-2 pt-2 border-t border-gray-300 dark:border-gray-600">
+                    <p class="text-blue-600 dark:text-blue-400 font-medium">💡 Open browser console for detailed matching info</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- HASIL LABORATORIUM -->
+        <div v-if="visitDetails.lab && visitDetails.lab.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-yellow-50 dark:bg-yellow-900/20 px-6 py-4 rounded-t-xl border-b border-yellow-200 dark:border-yellow-800">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-tabler-flask" class="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">Hasil Laboratorium</h4>
+              </div>
+            </div>
+          </div>
+          <div class="p-6 space-y-4">
+            <div v-for="(labItem, index) in visitDetails.lab" :key="`lab-${index}`" class="border-b dark:border-gray-700 pb-4 last:border-b-0">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex-1">
+                  <h5 class="font-semibold text-gray-900 dark:text-white">
+                    {{ labItem.jenis_perawatan?.nm_perawatan ?? 'Nama Pemeriksaan Tidak Diketahui' }}
+                  </h5>
+                  <!-- SNOMED Mapping untuk jenis pemeriksaan (hanya satu) -->
+                  <div v-if="getLabMapping(labItem)" class="mt-2">
+                    <div class="flex items-center gap-2 p-2 bg-green-100 dark:bg-green-900/30 rounded text-xs">
+                      <UIcon name="i-tabler-check" class="text-green-600" />
+                      <div class="flex-1">
+                        <!-- Display for rsia_mapping_lab data -->
+                        <template v-if="getLabMapping(labItem).code && getLabMapping(labItem).system === 'snomed'">
+                          <p class="font-medium">{{ labItem.jenis_perawatan?.nm_perawatan }} → {{ getLabMapping(labItem).display }}</p>
+                          <p class="text-xs text-gray-500">SNOMED: {{ getLabMapping(labItem).code }}</p>
+                        </template>
+                        <!-- Display for soap mappings data -->
+                        <template v-else>
+                          <p class="font-medium">"{{ getLabMapping(labItem).source_text }}" → {{ getLabMapping(labItem).snomed_term }}</p>
+                          <p class="text-xs text-gray-500">SNOMED: {{ getLabMapping(labItem).snomed_concept_id }} | Type: {{ getLabMapping(labItem).concept_type }}</p>
+                        </template>
+                      </div>
+                      <UButton
+                        icon="i-tabler-trash"
+                        size="2xs"
+                        color="red"
+                        variant="ghost"
+                        @click="removeLabMapping(getLabMapping(labItem), 0)"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-gray-500">
+                    {{ new Date(`${labItem.tgl_periksa} ${labItem.jam}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }}
+                  </span>
+                  <UButton
+                    v-if="!labItem.jenis_perawatan?.rsia_mapping_lab && !getLabMapping(labItem)"
+                    icon="i-tabler-plus"
+                    label="Mapping"
+                    color="yellow"
+                    size="xs"
+                    variant="soft"
+                    @click="openAddLabMapping(labItem)"
+                  />
+                  <UButton
+                    v-else
+                    icon="i-tabler-edit"
+                    label="Edit"
+                    color="green"
+                    size="xs"
+                    variant="soft"
+                    @click="openAddLabMapping(labItem)"
+                  />
+                </div>
+              </div>
+              <UTable
+                v-if="labItem.detail_periksa_lab && labItem.detail_periksa_lab.length > 0"
+                :rows="labItem.detail_periksa_lab"
+                :columns="labDetailColumns"
+                :ui="{ td: { padding: 'py-2 px-3 text-sm' }, th: { padding: 'py-2 px-3 text-sm bg-gray-50 dark:bg-gray-700' } }"
+                class="rounded-lg overflow-hidden"
+              >
+                <template #template.Pemeriksaan-data="{ row }">
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <span>{{ row.template?.Pemeriksaan }}</span>
+                      <!-- Show mapping info if exists -->
+                      <div v-if="row.template?.satu_sehat_mapping_lab" class="mt-1">
+                        <UBadge
+                          :label="`${row.template.satu_sehat_mapping_lab.code} - ${row.template.satu_sehat_mapping_lab.display}`"
+                          color="blue"
+                          variant="soft"
+                          size="2xs"
+                        />
+                      </div>
+                    </div>
+                    <!-- Tombol mapping untuk pemeriksaan spesifik -->
+                    <div class="flex items-center gap-1">
+                      <UButton
+                        v-if="row.template && !row.template?.satu_sehat_mapping_lab"
+                        icon="i-tabler-plus"
+                        size="2xs"
+                        color="yellow"
+                        variant="ghost"
+                        @click="openAddLabMappingDetail(labItem, row.template)"
+                      />
+                      <UButton
+                        v-else-if="row.template?.satu_sehat_mapping_lab"
+                        icon="i-tabler-edit"
+                        size="2xs"
+                        color="green"
+                        variant="ghost"
+                        @click="openAddLabMappingDetail(labItem, row.template)"
+                      />
+                    </div>
+                  </div>
+                </template>
+                <template #nilai-data="{ row }">
+                  <span :class="{ 'font-bold text-red-500': isNilaiAbnormal(row.nilai, row.nilai_rujukan) }">
+                    {{ row.nilai }}
+                  </span>
+                </template>
+              </UTable>
+              <p v-else class="text-sm text-gray-500 italic">Tidak ada detail hasil.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TARIF & TINDAKAN -->
+        <div v-if="procedureBilling && procedureBilling.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 rounded-t-xl border-b border-purple-200 dark:border-purple-800">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-tabler-coin" class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <h4 class="font-semibold text-purple-800 dark:text-purple-200">Tarif & Tindakan</h4>
+              </div>
+              <UButton
+                icon="i-tabler-refresh"
+                label="Refresh"
+                color="purple"
+                size="sm"
+                variant="soft"
+                @click="loadProcedureBilling"
+                :loading="loadingBilling"
+              />
+            </div>
+          </div>
+          <div class="p-6">
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="bg-purple-50 dark:bg-purple-900/10 rounded-lg p-4">
+                <div class="flex items-center gap-3">
+                  <div class="p-2 bg-purple-100 dark:bg-purple-800 rounded-lg">
+                    <UIcon name="i-tabler-file-description" class="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Tindakan</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ billingSummary.total_procedures || 0 }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-green-50 dark:bg-green-900/10 rounded-lg p-4">
+                <div class="flex items-center gap-3">
+                  <div class="p-2 bg-green-100 dark:bg-green-800 rounded-lg">
+                    <UIcon name="i-tabler-currency-dollar" class="w-5 h-5 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Biaya</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ formatCurrency(billingSummary.total_biaya) }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-blue-50 dark:bg-blue-900/10 rounded-lg p-4">
+                <div class="flex items-center gap-3">
+                  <div class="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                    <UIcon name="i-tabler-users" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Petugas Terlibat</p>
+                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ billingSummary.by_jenis_petugas?.length || 0 }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Procedures Table -->
+            <UTable
+              :rows="procedureBilling"
+              :columns="billingColumns"
+              :ui="{ td: { padding: 'py-3 px-4 text-sm' }, th: { padding: 'py-3 px-4 text-sm bg-gray-50 dark:bg-gray-700 font-semibold' } }"
+              class="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600"
+            >
+              <template #nm_perawatan-data="{ row }">
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-white">{{ row.nm_perawatan }}</p>
+                  <div class="flex items-center gap-2 mt-1">
+                    <UBadge
+                      :label="row.status_rawat"
+                      :color="row.status_rawat === 'Ralan' ? 'blue' : 'green'"
+                      size="2xs"
+                      variant="soft"
+                    />
+                    <UBadge
+                      :label="row.jenis_petugas"
+                      color="gray"
+                      size="2xs"
+                      variant="soft"
+                    />
+                  </div>
+                  <!-- SNOMED Mapping Display -->
+                  <div v-if="row.snomed_mapping && row.snomed_mapping.has_mapping" class="mt-2">
+                    <div class="bg-purple-50 dark:bg-purple-900/20 rounded p-2 border border-purple-200 dark:border-purple-800">
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                          <UIcon name="i-tabler-code" class="w-3 h-3 text-purple-600 dark:text-purple-400" />
+                          <span class="text-xs text-purple-700 dark:text-purple-300 font-mono">
+                            {{ row.snomed_mapping.snomed.code }}
+                          </span>
+                          <span class="text-xs text-purple-600 dark:text-purple-400">
+                            {{ row.snomed_mapping.snomed.display }}
+                          </span>
+                        </div>
+                        <UButton
+                          :label="'Edit'"
+                          size="2xs"
+                          color="purple"
+                          variant="soft"
+                          @click="openProcedureMappingModal(row, row.snomed_mapping)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Mapping Status (No Mapping) -->
+                  <div v-else-if="row.kd_jenis_prw && !row.snomed_mapping?.has_mapping" class="mt-2">
+                    <div class="bg-amber-50 dark:bg-amber-900/20 rounded p-2 border border-amber-200 dark:border-amber-800">
+                      <div class="flex items-center gap-2">
+                        <UIcon name="i-tabler-alert-triangle" class="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                        <span class="text-xs text-amber-700 dark:text-amber-300">
+                          Belum ada SNOMED mapping
+                        </span>
+                        <UButton
+                          :label="'Mapping'"
+                          size="2xs"
+                          color="amber"
+                          variant="soft"
+                          @click="openProcedureMappingModal(row)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <template #biaya_rawat-data="{ row }">
+                <div class="text-right">
+                  <p class="font-semibold text-gray-900 dark:text-white">{{ formatCurrency(row.biaya?.biaya_rawat || row.biaya_rawat) }}</p>
+                </div>
+              </template>
+
+              <template #waktu-data="{ row }">
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                  <p>{{ formatDate(row.tgl_perawatan) }}</p>
+                  <p class="text-xs">{{ row.jam_rawat }}</p>
+                </div>
+              </template>
+
+              <template #stts_bayar-data="{ row }">
+                <UBadge
+                  :label="row.stts_bayar || 'Belum'"
+                  :color="row.stts_bayar === 'Sudah' ? 'green' : 'yellow'"
+                  size="2xs"
+                  variant="soft"
+                />
+              </template>
+            </UTable>
+
+            <!-- Top Procedures -->
+            <div v-if="topProcedures && topProcedures.length > 0" class="mt-6">
+              <h5 class="font-semibold text-gray-900 dark:text-white mb-3">Tindakan Teratas (berdasarkan biaya)</h5>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div
+                  v-for="(proc, index) in topProcedures"
+                  :key="`top-proc-${index}`"
+                  class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 border border-gray-200 dark:border-gray-600"
+                >
+                  <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                      <p class="font-medium text-sm text-gray-900 dark:text-white">{{ proc.nm_perawatan }}</p>
+                      <p class="text-xs text-gray-500 mt-1">{{ proc.frequency }}x</p>
+                    </div>
+                    <p class="font-semibold text-sm text-purple-600 dark:text-purple-400">{{ formatCurrency(proc.total_biaya || 0) }}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RADIOLOGI -->
+        <div v-if="visitDetails.radiologi" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-indigo-50 dark:bg-indigo-900/20 px-6 py-4 rounded-t-xl border-b border-indigo-200 dark:border-indigo-800">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-radioactive" class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h4 class="font-semibold text-indigo-800 dark:text-indigo-200">Hasil Radiologi</h4>
+            </div>
+          </div>
+          <div class="p-6">
+            <pre class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">{{ visitDetails.radiologi }}</pre>
+          </div>
+        </div>
+
+        <!-- CATATAN TAMBAHAN -->
+        <div v-if="visitDetails.cppt_catatan && visitDetails.cppt_catatan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-gray-50 dark:bg-gray-900/20 px-6 py-4 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-note" class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <h4 class="font-semibold text-gray-800 dark:text-gray-200">Catatan Tambahan</h4>
+            </div>
+          </div>
+          <div class="p-6 space-y-3">
+            <div v-for="(catatan, index) in visitDetails.cppt_catatan" :key="`catatan-${index}`" class="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+              <div class="flex justify-between items-start mb-2">
+                <p class="font-medium text-sm">{{ new Date(`${catatan.tanggal} ${catatan.jam}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }}</p>
+                <p class="text-xs text-gray-500">Dokter: {{ catatan.kd_dokter }}</p>
+              </div>
+              <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ catatan.catatan }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- INLINE SNOMED SEARCH SECTION -->
+        <div v-if="showSNOMEDSearch" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 rounded-t-xl border-b border-blue-200 dark:border-blue-800">
+            <div class="flex justify-between items-center">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-tabler-search" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <h4 class="font-semibold text-blue-800 dark:text-blue-200">Pencarian SNOMED CT</h4>
+              </div>
+              <UButton
+                icon="i-tabler-x"
+                size="sm"
+                color="gray"
+                variant="ghost"
+                @click="toggleSNOMEDSearch"
+              />
+            </div>
+          </div>
+
+          <div class="p-6 space-y-4">
+            <!-- Search Input -->
+            <div>
+              <label class="block text-sm font-medium mb-2">Cari Konsep SNOMED</label>
+              <UInput
+                v-model="snomedSearchInline"
+                placeholder="Ketik minimal 3 karakter untuk mencari..."
+                @input="searchSnomedInline"
+                size="lg"
+                icon="i-tabler-search"
+              >
+                <template #trailing>
+                  <UIcon
+                    v-if="searchingSnomedInline"
+                    name="i-tabler-loader-2"
+                    class="animate-spin"
+                  />
+                </template>
+              </UInput>
+            </div>
+
+            <!-- Concept Type Filter -->
+            <div>
+              <label class="block text-sm font-medium mb-2">Tipe Konsep</label>
+              <USelectMenu
+                v-model="conceptTypeFilter"
+                :options="conceptTypeOptions"
+                placeholder="Pilih tipe konsep"
+              />
+            </div>
+
+            <!-- Search Results -->
+            <div v-if="snomedSearchResultsInline.length > 0" class="space-y-2">
+              <h5 class="text-sm font-medium">Hasil Pencarian:</h5>
+              <div class="max-h-60 overflow-y-auto border dark:border-gray-700 rounded-lg">
+                <div
+                  v-for="result in snomedSearchResultsInline"
+                  :key="result.snomed_concept_id"
+                  class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b dark:border-gray-700 last:border-b-0"
+                  @click="selectSnomedConceptInline(result)"
+                >
+                  <p class="font-semibold text-sm">{{ result.snomed_term }}</p>
+                  <p class="text-xs text-gray-500 mt-1">
+                    ID: {{ result.snomed_concept_id }} |
+                    Tag: {{ result.semantic_tag || 'N/A' }}
+                  </p>
+                  <p v-if="result.snomed_fsn" class="text-xs text-gray-400 mt-1">{{ result.snomed_fsn }}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selected Concept -->
+            <div v-if="selectedSNOMEDConcept.snomed_concept_id" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <h5 class="text-sm font-medium mb-2">Konsep Terpilih:</h5>
+              <p class="text-sm font-medium">{{ selectedSNOMEDConcept.snomed_term }}</p>
+              <p class="text-xs text-gray-500 mt-1">
+                SNOMED ID: {{ selectedSNOMEDConcept.snomed_concept_id }}
+                <span v-if="selectedSNOMEDConcept.snomed_fsn"> | FSN: {{ selectedSNOMEDConcept.snomed_fsn }}</span>
+              </p>
+            </div>
+
+            <!-- Text to Map -->
+            <div>
+              <label class="block text-sm font-medium mb-2">Teks yang akan dipetakan</label>
+              <UInput
+                v-model="textToMap"
+                placeholder="Masukkan teks dari clinical notes yang ingin dipetakan..."
+                size="lg"
+              />
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-2 pt-4">
+              <UButton
+                label="Batal"
+                color="gray"
+                variant="soft"
+                @click="resetSNOMEDSearch"
+              />
+              <UButton
+                label="Tambah Mapping"
+                color="blue"
+                @click="addSNOMEDMappingInline"
+                :disabled="!selectedSNOMEDConcept.snomed_concept_id || !textToMap"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- AUTO SUGGESTIONS -->
+        <div v-if="snomedSuggestions.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-amber-50 dark:bg-amber-900/20 px-6 py-4 rounded-t-xl border-b border-amber-200 dark:border-amber-800">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-bulb" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              <h4 class="font-semibold text-amber-800 dark:text-amber-200">Saran SNOMED (Auto Suggestions)</h4>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="space-y-2">
+              <div v-for="(sugg, idx) in snomedSuggestions.slice(0, 5)" :key="`sugg-${idx}`" class="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 rounded-lg">
+                <div>
+                  <span class="font-medium text-sm">"{{ sugg.source_text }}"</span>
+                  <span class="text-blue-600 dark:text-blue-400">→ {{ sugg.suggested_term }}</span>
+                  <span class="text-xs text-gray-500 ml-2">({{ sugg.source_field }})</span>
+                </div>
+                <UButton
+                  label="Gunakan"
+                  size="xs"
+                  color="blue"
+                  @click="useSuggestionForSOAP(sugg)"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="!loadingVisitDetails && !visitDetails" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
+        <div class="flex items-center gap-4">
+          <UIcon name="i-tabler-alert-circle" class="w-8 h-8 text-red-500" />
+          <div>
+            <h3 class="font-semibold text-red-800 dark:text-red-200">Gagal Memuat Detail</h3>
+            <p class="text-red-600 dark:text-red-300 text-sm">Terjadi kesalahan saat memuat detail pemeriksaan. Silakan coba lagi.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLOATING BPJS SUBMISSION BUTTON -->
+    <div v-if="selectedVisitData && !loadingVisitDetails" class="fixed bottom-6 right-6 z-50">
+      <div class="relative group">
+        <!-- Tooltip/Info Card -->
+        <div class="absolute bottom-full right-0 mb-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+          <div class="bg-gray-900 text-white text-sm rounded-lg p-3 shadow-lg min-w-48">
+            <div class="flex items-center gap-2 mb-2">
+              <UIcon name="i-tabler-info-circle" class="w-4 h-4" />
+              <span class="font-semibold">Kirim Data ke BPJS</span>
+            </div>
+            <div class="text-xs space-y-1 text-gray-300">
+              <p>• No. SEP: {{ selectedVisitData.no_sep }}</p>
+              <p>• No. Rawat: {{ selectedVisitData.no_rawat }}</p>
+              <p>• Jenis: {{ selectedVisitData.jnspelayanan }}</p>
+            </div>
+            <div class="mt-2 pt-2 border-t border-gray-700 text-xs text-blue-300">
+              Klik untuk mengirim semua data ERM dalam format FHIR Bundle
+            </div>
+          </div>
+          <!-- Arrow -->
+          <div class="absolute -bottom-2 right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900"></div>
+        </div>
+
+        <!-- Main Button -->
+        <UButton
+          icon="i-tabler-send"
+          label="Kirim ke BPJS"
+          color="green"
+          size="lg"
+          :loading="sendingToBpjs"
+          @click="sendToBpjs"
+          class="shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+          :ui="{
+            base: 'relative overflow-hidden rounded-xl font-semibold',
+            color: {
+              green: {
+                solid: 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white dark:from-green-600 dark:to-emerald-600 dark:hover:from-green-700 dark:hover:to-emerald-700',
+              }
+            }
+          }"
+        >
+          <template #trailing>
+            <UIcon v-if="!sendingToBpjs" name="i-tabler-rocket" class="w-4 h-4 animate-pulse" />
+          </template>
+        </UButton>
+
+        <!-- Success/Error Indicator -->
+        <div v-if="bpjsSubmissionStatus" class="absolute -top-2 -right-2 w-4 h-4 rounded-full border-2 border-white dark:border-gray-900"
+          :class="{
+            'bg-green-500': bpjsSubmissionStatus === 'success',
+            'bg-red-500': bpjsSubmissionStatus === 'error',
+            'bg-blue-500 animate-pulse': bpjsSubmissionStatus === 'sending'
+          }"
+        >
+          <UIcon
+            :name="bpjsSubmissionStatus === 'success' ? 'i-tabler-check' :
+                   bpjsSubmissionStatus === 'error' ? 'i-tabler-x' :
+                   'i-tabler-loader-2'"
+            class="w-3 h-3 text-white"
+            :class="{ 'animate-spin': bpjsSubmissionStatus === 'sending' }"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================= -->
+    <!-- MODAL: ADD/SEARCH SNOMED MAPPING         -->
+    <!-- ========================================= -->
+    <UModal v-model="openModalAddMapping" :ui="{ width: 'sm:max-w-2xl' }">
+      <UCard>
+        <template #header>
+          <h3 class="font-semibold">Add SNOMED Mapping</h3>
+          <p class="text-sm text-gray-500">Field: {{ currentMappingContext?.source_field }}</p>
+        </template>
+
+        <div class="space-y-4">
+          <!-- Full text context -->
+          <div class="p-3 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+            <p class="font-semibold mb-1">Full Text:</p>
+            <p class="text-gray-700 dark:text-gray-300">{{ currentMappingContext?.full_text }}</p>
+          </div>
+
+          <!-- Extract text -->
+          <div>
+            <label class="block text-sm font-medium mb-1">Text/Phrase to Map</label>
+            <UInput
+              v-model="newMapping.source_text"
+              placeholder="e.g., 'mata buram', 'nyeri dada'"
+              size="lg"
+            />
+            <p class="text-xs text-gray-500 mt-1">Extract specific phrase/sentence dari text di atas</p>
+          </div>
+
+          <!-- Search SNOMED -->
+          <div>
+            <label class="block text-sm font-medium mb-2">Search SNOMED Concept</label>
+            <UInput
+              v-model="snomedSearchTerm"
+              placeholder="Type to search... (min 3 characters)"
+              @input="searchSnomedDebounced"
+              size="lg"
+            >
+              <template #trailing>
+                <UIcon
+                  v-if="searchingSnomed"
+                  name="i-tabler-loader-2"
+                  class="animate-spin"
+                />
+                <UIcon v-else name="i-tabler-search" />
+              </template>
+            </UInput>
+
+            <!-- Search Results -->
+            <div
+              v-if="snomedSearchResults.length > 0"
+              class="mt-2 border dark:border-gray-700 rounded max-h-60 overflow-y-auto"
+            >
+              <div
+                v-for="result in snomedSearchResults"
+                :key="result.snomed_concept_id"
+                class="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer border-b dark:border-gray-700 last:border-b-0"
+                @click="selectSnomedConcept(result)"
+              >
+                <p class="font-semibold text-sm">{{ result.snomed_term }}</p>
+                <p class="text-xs text-gray-500 mt-1">
+                  ID: {{ result.snomed_concept_id }} |
+                  Tag: {{ result.semantic_tag || 'N/A' }}
+                </p>
+              </div>
+            </div>
+
+            <p v-else-if="snomedSearchTerm && snomedSearchTerm.length >= 3 && !searchingSnomed" class="text-sm text-gray-500 mt-2">
+              No results found
+            </p>
+          </div>
+
+          <!-- Selected SNOMED Concept -->
+          <div v-if="newMapping.snomed_concept_id" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded">
+            <p class="font-semibold text-sm">Selected:</p>
+            <p class="text-sm mt-1">{{ newMapping.snomed_term }}</p>
+            <p class="text-xs text-gray-500 mt-1">
+              SNOMED ID: {{ newMapping.snomed_concept_id }}
+            </p>
+            <p v-if="newMapping.snomed_fsn" class="text-xs text-gray-500">
+              FSN: {{ newMapping.snomed_fsn }}
+            </p>
+          </div>
+
+          <!-- Concept Type -->
+          <div>
+            <label class="block text-sm font-medium mb-1">Concept Type</label>
+            <USelectMenu
+              v-model="newMapping.concept_type"
+              :options="conceptTypeOptions"
+              placeholder="Select concept type"
+            />
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-end gap-2">
+            <UButton label="Cancel" color="gray" variant="soft" @click="closeAddMapping" />
+            <UButton
+              label="Add Mapping"
+              color="blue"
+              @click="confirmAddMapping"
+              :disabled="!newMapping.snomed_concept_id || !newMapping.source_text"
+              :loading="savingMapping"
+            />
+          </div>
+        </template>
+      </UCard>
+    </UModal>
+
+    <!-- ========================================= -->
+    <!-- MODAL: LAB MAPPING SNOMED                 -->
+    <!-- ========================================= -->
+    <UModal v-model="openModalLabMapping" :ui="{ width: 'sm:max-w-2xl' }">
+      <UCard>
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-tabler-flask" class="w-5 h-5 text-yellow-600" />
+            <div>
+              <h3 class="font-semibold">Lab SNOMED Mapping</h3>
+              <p class="text-sm text-gray-500">{{ currentLabContext?.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Laboratorium' }}</p>
+            </div>
+          </div>
+        </template>
+
+        <div class="space-y-6">
+          <!-- Lab Info -->
+          <div class="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+            <div class="flex items-start gap-3">
+              <UIcon name="i-tabler-info-circle" class="w-5 h-5 text-yellow-600 mt-0.5" />
+              <div class="flex-1">
+                <p class="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">Informasi Pemeriksaan</p>
+                <div class="space-y-1 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Jenis Pemeriksaan:</span>
+                    <span class="font-medium">{{ currentLabContext?.jenis_perawatan?.nm_perawatan }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Kode:</span>
+                    <span class="font-mono text-xs">{{ currentLabContext?.jenis_perawatan?.kd_jenis_prw }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Tanggal:</span>
+                    <span>{{ new Date(`${currentLabContext?.tgl_periksa} ${currentLabContext?.jam}`).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mapping Form -->
+          <div class="grid grid-cols-1 gap-4">
+            <!-- Code Field -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                SNOMED Code <span class="text-red-500">*</span>
+              </label>
+              <UInput
+                v-model="labSearchTerm"
+                placeholder="e.g., 445010003 atau 'hemoglobin'"
+                size="lg"
+                :loading="searchingLabSnomed"
+                @input="searchLabSnomedDebounced"
+              >
+                <template #trailing>
+                  <UIcon
+                    v-if="searchingLabSnomed"
+                    name="i-tabler-loader-2"
+                    class="animate-spin"
+                  />
+                  <UIcon v-else name="i-tabler-search" />
+                </template>
+              </UInput>
+              <p class="text-xs text-gray-500 mt-1">Ketik kode SNOMED atau nama pemeriksaan untuk pencarian otomatis</p>
+
+              <!-- SNOMED Search Results -->
+              <div v-if="labSearchResults.length > 0" class="mt-3 space-y-2">
+                <h5 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Hasil Pencarian SNOMED:</h5>
+                <div class="max-h-60 overflow-y-auto border dark:border-gray-700 rounded-lg">
+                  <div
+                    v-for="result in labSearchResults"
+                    :key="result.snomed_concept_id"
+                    class="p-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer border-b dark:border-gray-700 last:border-b-0 transition-colors"
+                    @click="selectLabSnomedConcept(result)"
+                  >
+                    <div class="flex items-start justify-between">
+                      <div class="flex-1">
+                        <p class="font-medium text-sm">{{ result.snomed_term }}</p>
+                        <div class="flex items-center gap-2 mt-1">
+                          <span class="text-xs text-gray-500">ID: {{ result.snomed_concept_id }}</span>
+                          <UBadge
+                            v-if="result.semantic_tag"
+                            :label="result.semantic_tag"
+                            color="blue"
+                            variant="soft"
+                            size="2xs"
+                          />
+                        </div>
+                        <p v-if="result.snomed_fsn" class="text-xs text-gray-400 mt-1 italic">{{ result.snomed_fsn }}</p>
+                      </div>
+                      <UIcon name="i-tabler-chevron-right" class="w-4 h-4 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- System Field -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                System <span class="text-red-500">*</span>
+              </label>
+              <USelectMenu
+                v-model="labMapping.system"
+                :options="[
+                  { label: 'SNOMED CT', value: 'snomed' },
+                  { label: 'LOINC', value: 'loinc' },
+                  { label: 'ICD-10', value: 'icd10' },
+                  { label: 'ICD-9-CM', value: 'icd9' },
+                  { label: 'Local', value: 'local' }
+                ]"
+                placeholder="Pilih sistem terminologi"
+                size="lg"
+              />
+              <p class="text-xs text-gray-500 mt-1">Pilih sistem terminologi yang digunakan</p>
+            </div>
+
+            <!-- Display Field -->
+            <div>
+              <label class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+                Display Name <span class="text-red-500">*</span>
+              </label>
+              <UTextarea
+                v-model="labMapping.display"
+                placeholder="e.g., Hemoglobin measurement"
+                :rows="2"
+                size="lg"
+              />
+              <p class="text-xs text-gray-500 mt-1">Terisi otomatis dari hasil pencarian atau bisa diedit manual</p>
+            </div>
+          </div>
+
+          <!-- Selected Mapping Preview -->
+          <div v-if="labMapping.code || labMapping.display" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <h5 class="font-semibold text-blue-800 dark:text-blue-200 mb-2">Preview Mapping:</h5>
+            <div class="space-y-1 text-sm">
+              <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-400">Code:</span>
+                <span class="font-mono font-medium">{{ labMapping.code || '-' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-400">System:</span>
+                <span class="font-medium">{{ labMapping.system || '-' }}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-gray-600 dark:text-gray-400">Display:</span>
+                <span class="font-medium text-right">{{ labMapping.display || '-' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Results State -->
+          <div v-else-if="labMapping.system === 'snomed' && labSearchTerm && labSearchTerm.length >= 3 && !searchingLabSnomed" class="text-center py-4">
+            <UIcon name="i-tabler-search-off" class="w-12 h-12 mx-auto text-gray-400 mb-2" />
+            <p class="text-sm text-gray-500">Tidak ada hasil untuk "{{ labSearchTerm }}"</p>
+            <p class="text-xs text-gray-400 mt-1">Coba kata kunci yang berbeda</p>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-between items-center">
+            <div class="text-sm text-gray-500">
+              <span class="font-medium">Tips:</span> Gunakan pencarian untuk menemukan kode SNOMED yang tepat
+            </div>
+            <div class="flex gap-2">
+              <UButton
+                label="Batal"
+                color="gray"
+                variant="soft"
+                @click="closeLabMapping"
+              />
+              <UButton
+                label="Simpan Mapping"
+                color="blue"
+                @click="confirmLabMapping"
+                :disabled="!labMapping.code || !labMapping.system || !labMapping.display"
+                :loading="savingLabMapping"
+              />
+            </div>
+          </div>
+        </template>
+      </UCard>
+    </UModal>
+
+    <!-- Procedure SNOMED Mapping Modal -->
+    <UModal v-model="showProcedureMappingModal" :ui="{ width: 'sm:max-w-2xl' }">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+              <UIcon name="i-tabler-code" class="w-5 h-5 mr-2" />
+              {{ procedureMapping.code ? 'Edit' : 'Add' }} SNOMED CT Mapping - {{ currentProcedure?.nm_perawatan }}
+            </h3>
+            <UButton
+              color="gray"
+              variant="ghost"
+              icon="i-tabler-x"
+              @click="showProcedureMappingModal = false"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-4">
+          <!-- Procedure Info -->
+          <div class="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+            <div class="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p class="text-gray-500 dark:text-gray-400">Kode Prosedur</p>
+                <p class="font-medium">{{ currentProcedure?.kd_jenis_prw }}</p>
+              </div>
+              <div>
+                <p class="text-gray-500 dark:text-gray-400">Nama Prosedur</p>
+                <p class="font-medium">{{ currentProcedure?.nm_perawatan }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- SNOMED Search -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Cari SNOMED CT Code
+            </label>
+            <div class="relative">
+              <UInput
+                v-model="procedureSearchTerm"
+                placeholder="Ketik kode atau nama SNOMED CT..."
+                icon="i-tabler-search"
+                @input="searchProcedureSnomed"
+                :loading="searchingProcedureSnomed"
+              />
+            </div>
+
+            <!-- Search Results -->
+            <div v-if="procedureSearchResults.length > 0" class="mt-2 max-h-48 overflow-y-auto">
+              <div class="space-y-1">
+                <div
+                  v-for="(result, index) in procedureSearchResults"
+                  :key="`procedure-search-${index}`"
+                  class="p-2 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  @click="selectProcedureSnomed(result)"
+                >
+                  <div class="flex items-center gap-2">
+                    <span class="font-mono text-xs text-purple-600 dark:text-purple-400">
+                      {{ result.code }}
+                    </span>
+                    <span class="text-sm text-gray-900 dark:text-white">
+                      {{ result.display }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mapping Form -->
+          <div class="grid grid-cols-1 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                SNOMED CT Code *
+              </label>
+              <UInput
+                v-model="procedureMapping.code"
+                placeholder="Contoh: 123456"
+                :disabled="searchingProcedureSnomed"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Display Name *
+              </label>
+              <UInput
+                v-model="procedureMapping.display"
+                placeholder="Contoh: Appendectomy"
+                :disabled="searchingProcedureSnomed"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                System URI
+              </label>
+              <UInput
+                v-model="procedureMapping.system"
+                placeholder="http://snomed.info/sct"
+                :disabled="searchingProcedureSnomed"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Deskripsi
+              </label>
+              <UTextarea
+                v-model="procedureMapping.description"
+                placeholder="Deskripsi singkat tentang prosedur..."
+                :rows="3"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Status
+              </label>
+              <USelect
+                v-model="procedureMapping.status"
+                :options="[
+                  { label: 'Active', value: 'active' },
+                  { label: 'Draft', value: 'draft' },
+                  { label: 'Inactive', value: 'inactive' }
+                ]"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Catatan
+              </label>
+              <UTextarea
+                v-model="procedureMapping.notes"
+                placeholder="Catatan tambahan..."
+                :rows="2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <template #footer>
+          <div class="flex justify-between items-center w-full">
+            <div class="text-sm text-gray-500">
+              <UIcon name="i-tabler-info-circle" class="w-4 h-4 inline mr-1" />
+              Mapping akan digunakan untuk integrasi sistem kesehatan
+            </div>
+            <div class="flex gap-2">
+              <UButton
+                label="Batal"
+                color="gray"
+                variant="soft"
+                @click="showProcedureMappingModal = false"
+              />
+              <UButton
+                label="Simpan Mapping"
+                color="purple"
+                :loading="savingProcedureMapping"
+                :disabled="!procedureMapping.code || !procedureMapping.display"
+                @click="saveProcedureMapping"
+              />
+            </div>
+          </div>
+        </template>
+      </UCard>
+    </UModal>
+
+    <template #footer>
+      <small>Data diambil dari server SIMRS</small>
+    </template>
+  </UCard>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, watch } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
+import { useClipboard } from '@vueuse/core'
+
+// ========================================
+// PROPS & STORES
+// ========================================
+const props = defineProps({
+  data: { required: true, type: Object },
+  refresh: { type: Function, required: true },
+  status: { type: String, required: true },
+  pending: { type: Boolean, default: false }
+})
+
+const config = useRuntimeConfig()
+const tokenStore = useAccessTokenStore()
+const toast = useToast()
+const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
+
+// ========================================
+// EXISTING REFS (Tab Riwayat)
+// ========================================
+const selectedRowData = ref(null)
+const selectedVisitData = ref(null)
+const isLoadingDetails = ref(false)
+const loadingVisitDetails = ref(false)
+const ermDetails = ref<any>(null)
+const visitDetails = ref<any>(null)
+const sep = ref('')
+const noRawat = ref('')
+
+// New refs for inline detail view
+const snomedSuggestions = ref([] as any[])
+const soapMappings = ref([] as any[])
+
+// Inline SNOMED search refs
+const showSNOMEDSearch = ref(false)
+const snomedSearchInline = ref('')
+const snomedSearchResultsInline = ref([] as any[])
+const searchingSnomedInline = ref(false)
+const selectedSNOMEDConcept = ref({
+  snomed_concept_id: null as number | null,
+  snomed_term: '',
+  snomed_fsn: ''
+})
+const textToMap = ref('')
+const conceptTypeFilter = ref('finding')
+
+const labDetailColumns = [
+  { key: 'template.Pemeriksaan', label: 'Pemeriksaan' },
+  { key: 'nilai', label: 'Hasil' },
+  { key: 'template.satuan', label: 'Satuan' },
+  { key: 'nilai_rujukan', label: 'Nilai Rujukan' },
+  { key: 'keterangan', label: 'Keterangan' }
+]
+
+// ========================================
+// NEW REFS (Unified View)
+// ========================================
+const viewFilter = ref('combined') // Default to combined view
+const viewFilterOptions = [
+  { label: 'Semua (Gabungan)', value: 'combined' },
+  { label: 'Riwayat Klaim', value: 'riwayat' },
+  { label: 'Coding SNOMED', value: 'coding' }
+]
+
+const codingQueue = ref([])
+const loadingCodingQueue = ref(false)
+const codingStatusFilter = ref('all') // Default show all
+
+const openModalCoding = ref(false)
+const selectedCodingSep = ref('')
+// Legacy modal variables (kept for compatibility)
+const codingDetail = ref<any>(null)
+const loadingCodingDetail = ref(false)
+const savingCoding = ref(false)
+
+const codingForm = ref({
+  no_sep: '',
+  no_rawat: '',
+  mappings: [] as any[],
+  catatan_koder: '',
+  status: 'draft'
+})
+
+// Add mapping modal
+const openModalAddMapping = ref(false)
+const currentMappingContext = ref<any>(null)
+const newMapping = ref({
+  source_text: '',
+  snomed_concept_id: null as number | null,
+  snomed_term: '',
+  snomed_fsn: '',
+  concept_type: 'symptom'
+})
+
+const snomedSearchTerm = ref('')
+const snomedSearchResults = ref([] as any[])
+const searchingSnomed = ref(false)
+const savingMapping = ref(false)
+
+const conceptTypeOptions = [
+  'symptom',
+  'finding',
+  'disorder',
+  'procedure',
+  'body_structure',
+  'other'
+]
+
+// Lab mapping refs
+const openModalLabMapping = ref(false)
+const currentLabContext = ref<any>(null)
+const savingLabMapping = ref(false)
+
+// Lab mapping form data
+const labMapping = ref({
+  code: '',
+  system: 'snomed',
+  display: ''
+})
+
+const labSearchTerm = ref('')
+const labSearchResults = ref([] as any[])
+const searchingLabSnomed = ref(false)
+
+// Procedure Billing refs
+const procedureBilling = ref([] as any[])
+const billingSummary = ref<any>(null)
+const topProcedures = ref([] as any[])
+const loadingBilling = ref(false)
+
+// Procedure Mapping refs
+const showProcedureMappingModal = ref(false)
+const currentProcedure = ref<any>(null)
+const procedureMapping = ref({
+  kd_jenis_prw: '',
+  code: '',
+  system: 'http://snomed.info/sct',
+  display: '',
+  description: '',
+  status: 'active',
+  notes: ''
+})
+const procedureSearchTerm = ref('')
+const procedureSearchResults = ref([] as any[])
+const searchingProcedureSnomed = ref(false)
+const savingProcedureMapping = ref(false)
+const sendingToBpjs = ref(false)
+const bpjsSubmissionStatus = ref<'idle' | 'sending' | 'success' | 'error'>('idle')
+
+const codingStatusOptions = [
+  { label: 'Semua', value: 'all' },
+  { label: 'Belum Coding', value: 'pending' },
+  { label: 'Draft', value: 'draft' },
+  { label: 'Final', value: 'final' }
+]
+
+// ========================================
+// COLUMNS
+// ========================================
+const riwayatColumns = [
+  { key: 'tglsep', label: 'Tgl. SEP' },
+  { key: 'no_sep', label: 'No. SEP' },
+  { key: 'no_rawat', label: 'No. Rawat' },
+  { key: 'jnspelayanan', label: 'Jenis' },
+  { key: 'tgl_masuk', label: 'Tgl Masuk' },
+  { key: 'tgl_keluar', label: 'Tgl Keluar' },
+  { key: 'cbg', label: 'CBG' },
+  { key: 'tarif', label: 'Tarif' },
+  { key: 'status_klaim_kemkes', label: 'Status Klaim Kemenkes' },
+  { key: 'actions', label: 'Aksi' }
+]
+
+const codingColumns = [
+  { key: 'no_sep', label: 'No. SEP' },
+  { key: 'no_rawat', label: 'No. Rawat' },
+  { key: 'poliklinik', label: 'Poliklinik' },
+  { key: 'dokter', label: 'Dokter' },
+  { key: 'tgl_kunjungan', label: 'Tgl Kunjungan' },
+  { key: 'jenis', label: 'Jenis' }, // Rawat Inap/Jalan
+  { key: 'coding_status', label: 'Status Coding' },
+  { key: 'actions', label: 'Aksi' }
+]
+
+const combinedColumns = [
+  { key: 'no_sep', label: 'No. SEP' },
+  { key: 'no_rawat', label: 'No. Rawat' },
+  { key: 'jenis', label: 'Jenis' },
+  { key: 'poliklinik', label: 'Poliklinik' },
+  { key: 'dokter', label: 'Dokter' },
+  { key: 'status_klaim', label: 'Status Klaim' },
+  { key: 'coding_status', label: 'Status Coding' },
+  { key: 'actions', label: 'Aksi' }
+]
+
+const billingColumns = [
+  { key: 'nm_perawatan', label: 'Tindakan' },
+  { key: 'jenis_petugas', label: 'Petugas' },
+  { key: 'biaya_rawat', label: 'Biaya' },
+  { key: 'waktu', label: 'Waktu' },
+  { key: 'stts_bayar', label: 'Status Bayar' }
+]
+
+// ========================================
+// COMPUTED PROPERTIES
+// ========================================
+const hasAnyData = computed(() => {
+  return (props.data?.data && props.data.data.length > 0) || codingQueue.value.length > 0
+})
+
+const combinedTableData = computed(() => {
+  const claimData = (props.data?.data as any[]) || []
+  const codingData = codingQueue.value
+
+  // Create a map for easy lookup
+  const claimMap = new Map<string, any>()
+  claimData.forEach(claim => {
+    claimMap.set(claim.no_sep, claim)
+  })
+
+  // Combine the data
+  const combined: any[] = []
+
+  // Add coding data
+  codingData.forEach(coding => {
+    const claim = claimMap.get(coding.no_sep)
+    combined.push({
+      ...coding,
+      hasCoding: true,
+      hasClaim: !!claim,
+      status_klaim: claim?.status_klaim || null,
+      reg_periksa: claim?.reg_periksa || coding.reg_periksa
+    })
+  })
+
+  // Add claim-only data (not in coding queue)
+  claimData.forEach(claim => {
+    if (!claimMap.has(claim.no_sep) || !codingData.some(c => c.no_sep === claim.no_sep)) {
+      combined.push({
+        ...claim,
+        hasCoding: false,
+        hasClaim: true,
+        coding_casemix: null
+      })
+    }
+  })
+
+  // Sort by date (newest first)
+  return combined.sort((a, b) => new Date(b.tglsep).getTime() - new Date(a.tglsep).getTime())
+})
+// Get patient info from props
+const currentPatient = computed(() => {
+  if (!props.data?.data || props.data.data.length === 0) {
+    return {
+      no_rkm_medis: null,
+      nama: null,
+      no_kartu: null
+    }
+  }
+  return {
+    no_rkm_medis: props.data.data[0]?.nomr,
+    nama: props.data.data[0]?.nama_pasien,
+    no_kartu: props.data.data[0]?.no_kartu
+  }
+})
+
+// ========================================
+// WATCHERS
+// ========================================
+watch(viewFilter, (newFilter) => {
+  if (newFilter === 'coding' || newFilter === 'combined') {
+    fetchCodingQueue()
+  }
+})
+
+watch(codingStatusFilter, () => {
+  fetchCodingQueue()
+})
+
+watch(copied, (val) => {
+  if (val) {
+    toast.add({
+      icon: 'i-tabler-circle-check',
+      title: 'Copied!',
+      description: 'Text copied to clipboard',
+      color: 'sky',
+      timeout: 2000
+    })
+  }
+})
+
+// Auto-load coding queue when component mounts and patient data is available
+watch(() => currentPatient.value.no_rkm_medis, (noRkmMedis) => {
+  if (noRkmMedis) {
+    fetchCodingQueue()
+  }
+}, { immediate: true })
+
+// ========================================
+// CODING FUNCTIONS
+// ========================================
+
+/**
+ * Copy text to clipboard
+ */
+function copyToClipboard(text: string) {
+  copy(text)
+}
+
+/**
+ * Fetch coding queue untuk pasien ini saja
+ */
+async function fetchCodingQueue() {
+  if (!currentPatient.value.no_rkm_medis) {
+    return
+  }
+
+  loadingCodingQueue.value = true
+  try {
+    const { data: queueData, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/queue-by-patient`,
+      {
+        method: 'GET',
+        params: {
+          no_rkm_medis: currentPatient.value.no_rkm_medis,
+          status: codingStatusFilter.value
+        },
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if (error.value) {
+      console.error('Error fetching coding queue:', error.value)
+      codingQueue.value = []
+    } else {
+      codingQueue.value = queueData.value?.data || []
+    }
+  } catch (err) {
+    console.error('Error fetching coding queue:', err)
+    codingQueue.value = []
+  } finally {
+    loadingCodingQueue.value = false
+  }
+}
+
+/**
+ * Handle click pada combined table row
+ */
+function handleCombinedRowClick(row: any) {
+  if (row.hasCoding) {
+    handleCodingRowClick(row)
+  } else if (row.hasClaim) {
+    handleRowClick(row)
+  }
+}
+
+/**
+ * Open coding for current selected visit
+ */
+function openCodingForCurrentVisit() {
+  if (selectedRowData.value && selectedRowData.value.no_sep) {
+    handleCodingRowClick(selectedRowData.value)
+  }
+}
+
+/**
+ * Handle click pada row coding queue
+ */
+async function handleCodingRowClick(row: any) {
+  selectedCodingSep.value = row.no_sep
+  openModalCoding.value = true
+  
+  await fetchCodingDetail(row.no_sep)
+}
+
+/**
+ * Fetch detail untuk coding
+ */
+async function fetchCodingDetail(no_sep: string) {
+  loadingCodingDetail.value = true
+  try {
+    const { data: detailData, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/visit/${no_sep}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if (error.value) {
+      toast.add({
+        icon: 'i-tabler-circle-x',
+        title: 'Error',
+        description: 'Gagal memuat detail coding',
+        color: 'red'
+      })
+      codingDetail.value = null
+    } else {
+      codingDetail.value = detailData.value?.data
+      
+      // Initialize form
+      codingForm.value = {
+        no_sep: codingDetail.value.no_sep,
+        no_rawat: codingDetail.value.no_rawat,
+        mappings: (codingDetail.value as any)?.existing_coding?.clinical_notes_snomed?.map((m: any) => ({
+          no_rawat: m.no_rawat,
+          tgl_perawatan: m.tgl_perawatan,
+          jam_rawat: m.jam_rawat,
+          source_field: m.source_field,
+          source_text: m.source_text,
+          snomed_concept_id: m.snomed_concept_id,
+          snomed_term: m.snomed_term,
+          snomed_fsn: m.snomed_fsn,
+          concept_type: m.concept_type,
+          confidence_score: m.confidence_score,
+          mapped_by: m.mapped_by
+        })) || [],
+        catatan_koder: codingDetail.value.existing_coding?.catatan_koder || '',
+        status: codingDetail.value.existing_coding?.status || 'draft'
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching coding detail:', err)
+    codingDetail.value = null
+  } finally {
+    loadingCodingDetail.value = false
+  }
+}
+
+/**
+ * Get coding status label
+ */
+function getCodingStatusLabel(row: any) {
+  if (!row.coding_casemix) return 'Belum Coding'
+  return row.coding_casemix.status.charAt(0).toUpperCase() + row.coding_casemix.status.slice(1)
+}
+
+/**
+ * Get coding status color
+ */
+function getCodingStatusColor(row: any) {
+  if (!row.coding_casemix) return 'gray'
+
+  const colors: Record<string, string> = {
+    'draft': 'orange',
+    'verified': 'blue',
+    'final': 'green'
+  }
+  return colors[row.coding_casemix.status] || 'gray'
+}
+
+/**
+ * Get mapped count
+ */
+function getMappedCount(soap: any) {
+  const count = codingForm.value.mappings.filter(m =>
+    m.no_rawat === soap.no_rawat &&
+    m.tgl_perawatan === soap.tgl_perawatan &&
+    m.jam_rawat === soap.jam_rawat
+  ).length
+  return count
+}
+
+/**
+ * Get mappings for SOAP field
+ */
+function getMappingsForSOAP(soap: any, field: string) {
+  return codingForm.value.mappings.filter(m =>
+    m.no_rawat === soap.no_rawat &&
+    m.tgl_perawatan === soap.tgl_perawatan &&
+    m.jam_rawat === soap.jam_rawat &&
+    m.source_field === field
+  )
+}
+
+/**
+ * Open add mapping modal
+ */
+function openAddMapping(soap: any, field: string) {
+  currentMappingContext.value = {
+    soap: soap,
+    source_field: field,
+    full_text: soap[field]
+  }
+  
+  newMapping.value = {
+    source_text: '',
+    snomed_concept_id: null,
+    snomed_term: '',
+    snomed_fsn: '',
+    concept_type: field === 'keluhan' ? 'symptom' : 
+                  field === 'pemeriksaan' ? 'finding' :
+                  field === 'penilaian' ? 'disorder' : 
+                  field === 'rtl' ? 'procedure' : 'other'
+  }
+  
+  snomedSearchTerm.value = ''
+  snomedSearchResults.value = []
+  
+  openModalAddMapping.value = true
+}
+
+/**
+ * Close add mapping modal
+ */
+function closeAddMapping() {
+  openModalAddMapping.value = false
+  currentMappingContext.value = null
+}
+
+/**
+ * Search SNOMED (debounced)
+ */
+const searchSnomedDebounced = useDebounceFn(async () => {
+  const term = snomedSearchTerm.value
+  
+  if (!term || term.length < 3) {
+    snomedSearchResults.value = []
+    return
+  }
+
+  searchingSnomed.value = true
+  
+  try {
+    const semanticTags = []
+    if (newMapping.value.concept_type === 'symptom' || newMapping.value.concept_type === 'finding') {
+      semanticTags.push('finding', 'disorder')
+    } else if (newMapping.value.concept_type === 'disorder') {
+      semanticTags.push('disorder')
+    } else if (newMapping.value.concept_type === 'procedure') {
+      semanticTags.push('procedure')
+    }
+    
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/snomed/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          term: term,
+          semantic_tags: semanticTags,
+          limit: 10
+        })
+      }
+    )
+
+    if (error.value) {
+      console.error('Search error:', error.value)
+      snomedSearchResults.value = []
+    } else {
+      snomedSearchResults.value = data.value?.data || []
+    }
+  } catch (err) {
+    console.error('Exception during search:', err)
+    snomedSearchResults.value = []
+  } finally {
+    searchingSnomed.value = false
+  }
+}, 500)
+
+/**
+ * Select SNOMED concept
+ */
+function selectSnomedConcept(result: any) {
+  newMapping.value.snomed_concept_id = result.snomed_concept_id
+  newMapping.value.snomed_term = result.snomed_term
+  newMapping.value.snomed_fsn = result.snomed_fsn || ''
+  
+  snomedSearchResults.value = []
+  snomedSearchTerm.value = result.snomed_term
+}
+
+/**
+ * Confirm add mapping
+ */
+async function confirmAddMapping() {
+  if (!currentMappingContext.value || !newMapping.value.snomed_concept_id || !selectedVisitData.value?.no_sep) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Data kunjungan tidak lengkap',
+      color: 'red'
+    })
+    return
+  }
+
+  savingMapping.value = true
+
+  try {
+    const mapping = {
+      no_sep: selectedVisitData.value.no_sep,
+      no_rawat: currentMappingContext.value.soap.no_rawat,
+      tgl_perawatan: currentMappingContext.value.soap.tgl_perawatan,
+      jam_rawat: currentMappingContext.value.soap.jam_rawat,
+      source_field: currentMappingContext.value.source_field,
+      source_text: newMapping.value.source_text,
+      snomed_concept_id: newMapping.value.snomed_concept_id,
+      snomed_term: newMapping.value.snomed_term,
+      snomed_fsn: newMapping.value.snomed_fsn,
+      concept_type: newMapping.value.concept_type,
+      confidence_score: null,
+      mapped_by: 'manual'
+    }
+
+    // Save to database via API
+    const response = await $fetch(`${config.public.API_V2_URL}/casemix/mapping/add`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(mapping)
+    })
+
+    console.log('SOAP mapping save response:', response)
+
+    if (response && response.success) {
+      // Add to local state after successful database save
+      codingForm.value.mappings.push(mapping)
+      soapMappings.value.push(mapping)
+
+      toast.add({
+        icon: 'i-tabler-check',
+        title: 'Mapping Ditambahkan',
+        description: `"${mapping.source_text}" dipetakan ke ${mapping.snomed_term}`,
+        color: 'green',
+        timeout: 2000
+      })
+
+      closeAddMapping()
+    } else {
+      throw new Error(response?.message || 'Failed to save mapping')
+    }
+  } catch (error) {
+    console.error('Error adding SOAP mapping:', error)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal menyimpan mapping ke database',
+      color: 'red'
+    })
+  } finally {
+    savingMapping.value = false
+  }
+}
+
+/**
+ * Remove mapping
+ */
+function removeMapping(index: number) {
+  codingForm.value.mappings.splice(index, index + 1)
+  
+  toast.add({
+    icon: 'i-tabler-trash',
+    title: 'Mapping Removed',
+    color: 'orange',
+    timeout: 2000
+  })
+}
+
+/**
+ * Use suggestion
+ */
+function useSuggestion(sugg: any) {
+  const soap = codingDetail.value.pemeriksaan_ralan.find(s => 
+    s[sugg.source_field] && s[sugg.source_field].includes(sugg.source_text)
+  )
+
+  if (!soap) return
+
+  const mapping = {
+    no_rawat: soap.no_rawat,
+    tgl_perawatan: soap.tgl_perawatan,
+    jam_rawat: soap.jam_rawat,
+    source_field: sugg.source_field,
+    source_text: sugg.source_text,
+    snomed_concept_id: sugg.snomed_concept_id,
+    snomed_term: sugg.suggested_term,
+    snomed_fsn: '',
+    concept_type: sugg.concept_type,
+    confidence_score: 0.7,
+    mapped_by: 'assisted'
+  }
+
+  codingForm.value.mappings.push(mapping)
+
+  toast.add({
+    icon: 'i-tabler-sparkles',
+    title: 'Suggestion Applied',
+    description: `"${mapping.source_text}" mapped to ${mapping.snomed_term}`,
+    color: 'blue',
+    timeout: 2000
+  })
+}
+
+/**
+ * Save coding
+ */
+async function saveCoding(status: string) {
+  if (codingForm.value.mappings.length === 0) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Validation Error',
+      description: 'Minimal harus ada 1 mapping',
+      color: 'orange'
+    })
+    return
+  }
+
+  savingCoding.value = true
+
+  try {
+    // Use soapMappings if available, otherwise fall back to form mappings
+    const mappingsToSave = soapMappings.value.length > 0 ? soapMappings.value : codingForm.value.mappings
+
+    const payload = {
+      no_sep: codingForm.value.no_sep,
+      no_rawat: codingForm.value.no_rawat,
+      mappings: mappingsToSave,
+      catatan_koder: codingForm.value.catatan_koder,
+      status: status
+    }
+
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/coding`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }
+    )
+
+    if (error.value) {
+      toast.add({
+        icon: 'i-tabler-circle-x',
+        title: 'Error',
+        description: 'Gagal menyimpan coding',
+        color: 'red'
+      })
+    } else {
+      toast.add({
+        icon: 'i-tabler-circle-check',
+        title: 'Success',
+        description: `Coding berhasil disimpan dengan status: ${status}`,
+        color: 'green'
+      })
+      
+      closeModalCoding()
+      fetchCodingQueue()
+      
+      if (status === 'final') {
+        props.refresh()
+      }
+    }
+  } catch (err) {
+    console.error('Error saving coding:', err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Terjadi kesalahan saat menyimpan',
+      color: 'red'
+    })
+  } finally {
+    savingCoding.value = false
+  }
+}
+
+/**
+ * Close modal coding
+ */
+function closeModalCoding() {
+  openModalCoding.value = false
+  selectedCodingSep.value = ''
+  codingDetail.value = null
+  codingForm.value = {
+    no_sep: '',
+    no_rawat: '',
+    mappings: [],
+    catatan_koder: '',
+    status: 'draft'
+  }
+}
+
+// ========================================
+// EXISTING FUNCTIONS (Tab Riwayat)
+// ========================================
+
+async function handleRowClick(row: any) {
+  // Set selected visit data regardless of klaim status
+  selectedVisitData.value = row
+  selectedRowData.value = row
+  sep.value = row.no_sep || ''
+  noRawat.value = row.no_rawat || ''
+
+  // Always fetch visit details and SNOMED data
+  await fetchVisitDetails(row.no_sep)
+
+  // Check klaim status and fetch ERM details if available
+  const kemkesStatus = getKlaimStatus(row)
+
+
+  if (kemkesStatus === 'sent' && sep.value) {
+    await fetchErmDetails(sep.value)
+  } else {
+    // Clear ERM details if klaim not sent
+    ermDetails.value = null
+  }
+
+  // Show info about klaim status if not sent
+  if (kemkesStatus !== 'sent') {
+    toast.add({
+      icon: 'i-tabler-info-circle',
+      title: 'Status Klaim',
+      description: kemkesStatus ? `Status klaim: ${kemkesStatus}` : 'Status klaim tidak tersedia. Detail ERM hanya tersedia jika status klaim sudah "sent".',
+      color: kemkesStatus === 'unsent' ? 'yellow' : 'orange',
+      timeout: 4000
+    })
+  }
+}
+
+/**
+ * Fetch visit details for inline display
+ */
+async function fetchVisitDetails(no_sep: string) {
+  loadingVisitDetails.value = true
+  visitDetails.value = null
+  try {
+    const { data: detailsData, error } = await useFetch(
+      `${config.public.API_V2_URL}/erm/details/${no_sep}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if (error.value) {
+      console.error("Error fetching visit details:", error.value)
+      toast.add({
+        icon: 'i-tabler-circle-x',
+        title: 'Error',
+        description: 'Gagal memuat detail kunjungan. Hubungi administrator.',
+        color: 'red',
+        timeout: 5000
+      })
+      visitDetails.value = null
+    } else {
+      visitDetails.value = detailsData.value?.data?.data || detailsData.value?.data
+      // Load SNOMED suggestions and mappings
+      await loadSNOMEDData(no_sep)
+      console.log('About to call loadLabMappings...')
+      // Load existing lab mappings
+      await loadLabMappings()
+      console.log('loadLabMappings completed')
+      // Load procedure billing data
+      await loadProcedureBilling()
+      console.log('Visit details loaded:', visitDetails.value)
+    }
+
+  } catch (err) {
+    console.error("Exception fetching visit details:", err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Terjadi kesalahan saat memuat detail kunjungan.',
+      color: 'red',
+      timeout: 5000
+    })
+    visitDetails.value = null
+  } finally {
+    loadingVisitDetails.value = false
+  }
+}
+
+/**
+ * Load SNOMED suggestions and mappings
+ */
+async function loadSNOMEDData(no_sep: string) {
+  try {
+    // Load existing SNOMED mappings
+    const { data: mappingData } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/visit/${no_sep}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if ((mappingData.value as any)?.data?.existing_coding?.clinical_notes_snomed) {
+      soapMappings.value = (mappingData.value as any).data.existing_coding.clinical_notes_snomed
+      console.log(`✅ Loaded ${soapMappings.value.length} SOAP mappings for SEP: ${no_sep}`)
+    } else {
+      soapMappings.value = []
+    }
+
+    // Load suggestions
+    if ((mappingData.value as any)?.data?.suggestions) {
+      snomedSuggestions.value = (mappingData.value as any).data.suggestions
+    }
+  } catch (err) {
+    console.error("Error loading SNOMED data:", err)
+  }
+}
+
+/**
+ * Load existing lab mappings from rsia_mapping_lab
+ */
+async function loadLabMappings() {
+  try {
+    if (!visitDetails.value?.lab) return
+
+    // Load template mappings from satu_sehat_mapping_lab
+    try {
+      const templateMappingsData = await $fetch(
+        `${config.public.API_V2_URL}/test-mapping-templates`
+      )
+
+      const templateMappings = templateMappingsData?.data || []
+
+      // Add template mappings to lab detail items
+      visitDetails.value.lab.forEach((lab: any) => {
+        if (lab.detail_periksa_lab) {
+          lab.detail_periksa_lab.forEach((detail: any) => {
+            if (detail.template?.id_template) {
+              const templateMapping = templateMappings.find((m: any) =>
+                m.id_template === detail.template.id_template
+              )
+              if (templateMapping) {
+                detail.template.satu_sehat_mapping_lab = templateMapping
+              }
+            }
+          })
+        }
+      })
+
+    } catch (err) {
+      console.error('Error loading template mappings:', err)
+    }
+
+    // Load procedure mappings from rsia_mapping_lab
+    try {
+      // Fetch existing mappings
+      const mappingsData = await $fetch(
+        `${config.public.API_V2_URL}/mapping-lab/system?system=snomed`
+      )
+
+      const existingMappings = mappingsData?.data || []
+
+      // Add mappings to visitDetails data for display
+      visitDetails.value.lab.forEach((lab: any) => {
+        if (lab.jenis_perawatan?.kd_jenis_prw) {
+          const mapping = existingMappings.find((m: any) =>
+            m.kd_jenis_prw === lab.jenis_perawatan.kd_jenis_prw
+          )
+          if (mapping) {
+            lab.jenis_perawatan.rsia_mapping_lab = mapping
+          }
+        }
+      })
+
+    } catch (err) {
+      console.error('Error loading lab mappings:', err)
+    }
+
+  } catch (error) {
+    console.error('Error in loadLabMappings:', error)
+  }
+}
+
+/**
+ * Get mapped count for SOAP item
+ */
+function getMappedCountForSOAP(soap: any): number {
+  const normalizedSoapDate = normalizeDate(soap.tgl_perawatan)
+  const normalizedSoapTime = normalizeTime(soap.jam_rawat)
+
+  const count = soapMappings.value.filter(m => {
+    const normalizedDbDate = normalizeDate(m.tgl_perawatan)
+    const normalizedDbTime = normalizeTime(m.jam_rawat)
+
+    // Exact match
+    const exactMatch =
+      m.no_rawat === soap.no_rawat &&
+      normalizedDbDate === normalizedSoapDate &&
+      normalizedDbTime === normalizedSoapTime
+
+    // Fallback: match by no_rawat and date only (if time matching fails)
+    const fallbackMatch =
+      !exactMatch &&
+      m.no_rawat === soap.no_rawat &&
+      normalizedDbDate === normalizedSoapDate
+
+    return exactMatch || fallbackMatch
+  }).length
+
+  return count
+}
+
+/**
+ * Normalize date format for comparison
+ */
+function normalizeDate(date: string): string {
+  if (!date) return ''
+
+  try {
+    // Handle ISO format with timezone: 2025-04-27T17:00:00.000000Z
+    if (date.includes('T') && date.includes('Z')) {
+      // Parse ISO date and convert to local timezone
+      const isoDate = new Date(date)
+      // Format to YYYY-MM-DD in local timezone
+      const year = isoDate.getFullYear()
+      const month = String(isoDate.getMonth() + 1).padStart(2, '0')
+      const day = String(isoDate.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    // Handle regular datetime format: 2025-04-28 HH:MM:SS
+    if (date.includes(' ')) {
+      const dateOnly = date.split(' ')[0]
+      return dateOnly
+    }
+
+    // Handle date only format: 2025-04-28
+    return date
+  } catch (error) {
+    console.warn('Error normalizing date:', date, error)
+    return date
+  }
+}
+
+/**
+ * Normalize time format for comparison
+ */
+function normalizeTime(time: string): string {
+  if (!time) return ''
+
+  // Ensure HH:MM:SS format
+  if (time.length === 5) {
+    return time + ':00'
+  }
+  if (time.length === 8) {
+    return time
+  }
+
+  // If includes date part, extract time only
+  const timeOnly = time.split(' ')[1] || time.split(' ')[0]
+  return timeOnly.length === 5 ? timeOnly + ':00' : timeOnly
+}
+
+/**
+ * Get SOAP mappings for specific field
+ */
+function getSOAPMappings(soap: any, field: string): any[] {
+  const normalizedSoapDate = normalizeDate(soap.tgl_perawatan)
+  const normalizedSoapTime = normalizeTime(soap.jam_rawat)
+
+  const mappings = soapMappings.value.filter(m => {
+    const normalizedDbDate = normalizeDate(m.tgl_perawatan)
+    const normalizedDbTime = normalizeTime(m.jam_rawat)
+
+    // Exact match
+    const exactMatch =
+      m.no_rawat === soap.no_rawat &&
+      normalizedDbDate === normalizedSoapDate &&
+      normalizedDbTime === normalizedSoapTime &&
+      m.source_field === field
+
+    // Fallback: match by no_rawat and field only (if time matching fails)
+    const fallbackMatch =
+      !exactMatch &&
+      m.no_rawat === soap.no_rawat &&
+      m.source_field === field &&
+      normalizedDbDate === normalizedSoapDate
+
+    return exactMatch || fallbackMatch
+  })
+
+  // Only log for penilaian field with mappings
+  if (mappings.length > 0 && field === 'penilaian') {
+    console.log(`✅ SOAP: Found ${mappings.length} mappings for ${field}:`, mappings.map(m => ({
+      source: m.source_text,
+      snomed: `${m.snomed_term} (${m.snomed_concept_id})`,
+      match: m.source_field
+    })))
+  }
+
+  return mappings
+}
+
+/**
+ * Open add mapping modal for specific SOAP
+ */
+function openAddMappingForSOAP(soap: any, field: string) {
+  currentMappingContext.value = {
+    soap: soap,
+    source_field: field,
+    full_text: soap[field]
+  }
+
+  newMapping.value = {
+    source_text: '',
+    snomed_concept_id: null as number | null,
+    snomed_term: '',
+    snomed_fsn: '',
+    concept_type: field === 'keluhan' ? 'symptom' :
+                  field === 'pemeriksaan' ? 'finding' :
+                  field === 'penilaian' ? 'disorder' :
+                  field === 'rtl' ? 'procedure' : 'other'
+  }
+
+  snomedSearchTerm.value = ''
+  snomedSearchResults.value = []
+
+  openModalAddMapping.value = true
+}
+
+/**
+ * Remove mapping from list
+ */
+function removeMappingFromList(mapping: any, index: number) {
+  // Find and remove from soapMappings
+  const mappingIndex = soapMappings.value.findIndex(m =>
+    m.no_rawat === mapping.no_rawat &&
+    m.tgl_perawatan === mapping.tgl_perawatan &&
+    m.jam_rawat === mapping.jam_rawat &&
+    m.source_field === mapping.source_field &&
+    m.snomed_concept_id === mapping.snomed_concept_id
+  )
+
+  if (mappingIndex !== -1) {
+    soapMappings.value.splice(mappingIndex, 1)
+  }
+
+  toast.add({
+    icon: 'i-tabler-trash',
+    title: 'Mapping Dihapus',
+    color: 'orange',
+    timeout: 2000
+  })
+}
+
+/**
+ * Use suggestion for SOAP
+ */
+function useSuggestionForSOAP(sugg: any) {
+  const soap = visitDetails.value?.cppt_pemeriksaan_ralan.find((s: any) =>
+    s[sugg.source_field] && s[sugg.source_field].includes(sugg.source_text)
+  )
+
+  if (!soap) return
+
+  const mapping = {
+    no_rawat: soap.no_rawat,
+    tgl_perawatan: soap.tgl_perawatan,
+    jam_rawat: soap.jam_rawat,
+    source_field: sugg.source_field,
+    source_text: sugg.source_text,
+    snomed_concept_id: sugg.snomed_concept_id,
+    snomed_term: sugg.suggested_term,
+    snomed_fsn: '',
+    concept_type: sugg.concept_type,
+    confidence_score: 0.7,
+    mapped_by: 'assisted'
+  }
+
+  soapMappings.value.push(mapping)
+
+  toast.add({
+    icon: 'i-tabler-sparkles',
+    title: 'Saran Diterapkan',
+    description: `"${mapping.source_text}" dipetakan ke ${mapping.snomed_term}`,
+    color: 'blue',
+    timeout: 2000
+  })
+}
+
+/**
+ * Toggle inline SNOMED search
+ */
+function toggleSNOMEDSearch() {
+  showSNOMEDSearch.value = !showSNOMEDSearch.value
+  if (!showSNOMEDSearch.value) {
+    resetSNOMEDSearch()
+  }
+}
+
+/**
+ * Search SNOMED inline
+ */
+const searchSnomedInline = useDebounceFn(async () => {
+  const term = snomedSearchInline.value
+
+  if (!term || term.length < 3) {
+    snomedSearchResultsInline.value = []
+    return
+  }
+
+  searchingSnomedInline.value = true
+
+  try {
+    const semanticTags = []
+    if (conceptTypeFilter.value === 'symptom' || conceptTypeFilter.value === 'finding') {
+      semanticTags.push('finding', 'disorder')
+    } else if (conceptTypeFilter.value === 'disorder') {
+      semanticTags.push('disorder')
+    } else if (conceptTypeFilter.value === 'procedure') {
+      semanticTags.push('procedure')
+    }
+
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/snomed/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          term: term,
+          semantic_tags: semanticTags,
+          limit: 10
+        })
+      }
+    )
+
+    if (error.value) {
+      console.error('Search error:', error.value)
+      snomedSearchResultsInline.value = []
+    } else {
+      snomedSearchResultsInline.value = data.value?.data || []
+    }
+  } catch (err) {
+    console.error('Exception during search:', err)
+    snomedSearchResultsInline.value = []
+  } finally {
+    searchingSnomedInline.value = false
+  }
+}, 500)
+
+/**
+ * Select SNOMED concept inline
+ */
+function selectSnomedConceptInline(result: any) {
+  selectedSNOMEDConcept.value = {
+    snomed_concept_id: result.snomed_concept_id,
+    snomed_term: result.snomed_term,
+    snomed_fsn: result.snomed_fsn || ''
+  }
+
+  snomedSearchResultsInline.value = []
+  snomedSearchInline.value = result.snomed_term
+}
+
+/**
+ * Add SNOMED mapping inline
+ */
+async function addSNOMEDMappingInline() {
+  if (!selectedSNOMEDConcept.value.snomed_concept_id || !textToMap.value) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Pilih konsep SNOMED dan masukkan teks yang akan dipetakan',
+      color: 'orange'
+    })
+    return
+  }
+
+  try {
+    const mapping = {
+      no_rawat: selectedVisitData.value.no_rawat,
+      tgl_perawatan: visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.tgl_perawatan || new Date().toISOString().split('T')[0],
+      jam_rawat: visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.jam_rawat || new Date().toTimeString().split(' ')[0],
+      source_field: 'general', // Could be improved with field selection
+      source_text: textToMap.value,
+      snomed_concept_id: selectedSNOMEDConcept.value.snomed_concept_id,
+      snomed_term: selectedSNOMEDConcept.value.snomed_term,
+      snomed_fsn: selectedSNOMEDConcept.value.snomed_fsn,
+      concept_type: conceptTypeFilter.value,
+      confidence_score: null,
+      mapped_by: 'manual'
+    }
+
+    // Add to local mappings
+    soapMappings.value.push(mapping)
+
+    // Save to server
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/coding`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          no_sep: selectedVisitData.value.no_sep,
+          no_rawat: selectedVisitData.value.no_rawat,
+          mappings: [mapping],
+          catatan_koder: '',
+          status: 'draft'
+        })
+      }
+    )
+
+    if (error.value) {
+      throw error.value
+    }
+
+    toast.add({
+      icon: 'i-tabler-check',
+      title: 'Mapping Berhasil Ditambahkan',
+      description: `"${textToMap.value}" dipetakan ke ${selectedSNOMEDConcept.value.snomed_term}`,
+      color: 'green',
+      timeout: 2000
+    })
+
+    // Reset form
+    resetSNOMEDSearch()
+
+  } catch (err) {
+    console.error('Error adding mapping:', err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Gagal menambahkan mapping. Silakan coba lagi.',
+      color: 'red'
+    })
+  }
+}
+
+/**
+ * Reset SNOMED search
+ */
+function resetSNOMEDSearch() {
+  snomedSearchInline.value = ''
+  snomedSearchResultsInline.value = []
+  selectedSNOMEDConcept.value = {
+    snomed_concept_id: null,
+    snomed_term: '',
+    snomed_fsn: ''
+  }
+  textToMap.value = ''
+  conceptTypeFilter.value = 'finding'
+}
+
+// ========================================
+// LAB MAPPING FUNCTIONS
+// ========================================
+
+/**
+ * Toggle LOINC/SNOMED search for lab
+ */
+function toggleLOINCSearch() {
+  // Fungsi ini akan menggunakan SNOMED search yang sudah ada
+  showSNOMEDSearch.value = !showSNOMEDSearch.value
+}
+
+/**
+ * Get lab mapping for specific lab item (only one per kd_jenis_prw)
+ */
+function getLabMapping(labItem: any): any | null {
+  // First check for rsia_mapping_lab data (primary lab mapping)
+  if (labItem.jenis_perawatan?.rsia_mapping_lab) {
+    return labItem.jenis_perawatan.rsia_mapping_lab
+  }
+
+  // Fall back to soap mappings (individual clinical note mappings)
+  return soapMappings.value.find(m =>
+    m.no_rawat === labItem.no_rawat &&
+    m.source_field === 'laboratorium' &&
+    m.source_text === labItem.jenis_perawatan?.nm_perawatan
+  ) || null
+}
+
+/**
+ * Open lab mapping modal
+ */
+function openAddLabMapping(labItem: any) {
+  console.log('Opening lab mapping for:', labItem) // Debug log
+  console.log('kd_jenis_prw:', labItem.jenis_perawatan?.kd_jenis_prw) // Debug log
+
+  currentLabContext.value = labItem
+
+  // Pre-populate with existing mapping data
+  const existingMapping = labItem.jenis_perawatan?.rsia_mapping_lab
+
+  labMapping.value = {
+    code: existingMapping?.code || '',
+    system: existingMapping?.system || 'snomed',
+    display: existingMapping?.display || ''
+  }
+
+  labSearchTerm.value = existingMapping?.display || ''
+  labSearchResults.value = []
+
+  openModalLabMapping.value = true
+}
+
+/**
+ * Open lab mapping modal for detail template
+ */
+function openAddLabMappingDetail(labItem: any, template: any) {
+  currentLabContext.value = {
+    ...labItem,
+    template: template
+  }
+
+  // Pre-populate with existing mapping data
+  const existingMapping = template.rsia_mapping_lab || labItem.jenis_perawatan?.rsia_mapping_lab
+
+  labMapping.value = {
+    code: existingMapping?.code || '',
+    system: existingMapping?.system || 'snomed',
+    display: existingMapping?.display || ''
+  }
+
+  labSearchTerm.value = existingMapping?.display || ''
+  labSearchResults.value = []
+
+  openModalLabMapping.value = true
+}
+
+/**
+ * Close lab mapping modal
+ */
+function closeLabMapping() {
+  openModalLabMapping.value = false
+  currentLabContext.value = null
+}
+
+/**
+ * Search SNOMED for lab (debounced)
+ */
+const searchLabSnomedDebounced = useDebounceFn(async () => {
+  const term = labSearchTerm.value
+
+  if (!term || term.length < 3 || labMapping.value.system !== 'snomed') {
+    labSearchResults.value = []
+    return
+  }
+
+  searchingLabSnomed.value = true
+
+  try {
+    // Focus on lab-related semantic tags
+    const semanticTags = ['finding', 'procedure', 'substance', 'specimen', 'disorder']
+
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/snomed/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          term: term,
+          semantic_tags: semanticTags,
+          limit: 10
+        })
+      }
+    )
+
+    if (error.value) {
+      console.error('Search error:', error.value)
+      labSearchResults.value = []
+    } else {
+      labSearchResults.value = data.value?.data || []
+    }
+  } catch (err) {
+    console.error('Exception during search:', err)
+    labSearchResults.value = []
+  } finally {
+    searchingLabSnomed.value = false
+  }
+}, 500)
+
+/**
+ * Select SNOMED concept for lab
+ */
+function selectLabSnomedConcept(result: any) {
+  labMapping.value.code = result.snomed_concept_id.toString()
+  labMapping.value.display = result.snomed_term
+
+  labSearchResults.value = []
+  labSearchTerm.value = result.snomed_term
+}
+
+/**
+ * Confirm lab mapping
+ */
+async function confirmLabMapping() {
+  if (!currentLabContext.value || !labMapping.value.code || !labMapping.value.system || !labMapping.value.display) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Semua field wajib diisi',
+      color: 'red'
+    })
+    return
+  }
+
+  savingLabMapping.value = true
+
+  try {
+    const mapping = {
+      no_rawat: currentLabContext.value.no_rawat,
+      tgl_perawatan: currentLabContext.value.tgl_periksa,
+      jam_rawat: currentLabContext.value.jam,
+      source_field: 'laboratorium',
+      source_text: currentLabContext.value.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Lab',
+      snomed_concept_id: parseInt(labMapping.value.code),
+      snomed_term: labMapping.value.display,
+      snomed_fsn: labMapping.value.display,
+      concept_type: 'finding',
+      confidence_score: null,
+      mapped_by: 'manual'
+    }
+
+    // Remove existing mapping for this jenis perawatan (ensure only one)
+    soapMappings.value = soapMappings.value.filter(m =>
+      !(m.no_rawat === currentLabContext.value.no_rawat &&
+        m.source_field === 'laboratorium' &&
+        m.source_text === currentLabContext.value.jenis_perawatan?.nm_perawatan)
+    )
+
+    // Add new mapping
+    soapMappings.value.push(mapping)
+
+    // Save to server
+    await saveLabMapping(mapping)
+
+    // Update UI state
+    if (currentLabContext.value?.jenis_perawatan) {
+      currentLabContext.value.jenis_perawatan.rsia_mapping_lab = {
+        kd_jenis_prw: currentLabContext.value.jenis_perawatan.kd_jenis_prw,
+        code: labMapping.value.code,
+        system: labMapping.value.system,
+        display: labMapping.value.display
+      }
+    }
+
+    toast.add({
+      icon: 'i-tabler-check',
+      title: 'Lab Mapping Berhasil',
+      description: `"${currentLabContext.value.jenis_perawatan?.nm_perawatan}" dipetakan ke ${labMapping.value.display}`,
+      color: 'green',
+      timeout: 2000
+    })
+
+    closeLabMapping()
+  } catch (err) {
+    console.error('Error confirming lab mapping:', err)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal menyimpan mapping',
+      color: 'red'
+    })
+  } finally {
+    savingLabMapping.value = false
+  }
+}
+
+/**
+ * Save lab mapping to server
+ */
+async function saveLabMapping(mapping: any) {
+  try {
+    // Validasi kd_jenis_prw
+    const kdJenisPrw = currentLabContext.value?.jenis_perawatan?.kd_jenis_prw
+    if (!kdJenisPrw) {
+      console.error('kd_jenis_prw is missing:', currentLabContext.value)
+      throw new Error('Kode jenis perawatan tidak ditemukan')
+    }
+
+    // Simpan ke rsia_mapping_lab
+    const labMappingData = {
+      kd_jenis_prw: kdJenisPrw,
+      code: labMapping.value.code || mapping.snomed_concept_id?.toString(),
+      system: labMapping.value.system || 'snomed',
+      display: labMapping.value.display || mapping.snomed_term
+    }
+
+    console.log('Lab mapping data to save:', labMappingData)
+
+    // Cek apakah mapping sudah ada
+    if (labMappingData.kd_jenis_prw) {
+      try {
+        // Check existing mapping
+        const existingMapping = await $fetch(
+          `${config.public.API_V2_URL}/mapping-lab/${labMappingData.kd_jenis_prw}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${tokenStore.accessToken}`
+            }
+          }
+        )
+
+        // Update existing mapping - don't send kd_jenis_prw in body for PUT
+        const updateData = {
+          code: labMappingData.code,
+          system: labMappingData.system,
+          display: labMappingData.display
+        }
+
+        await $fetch(
+          `${config.public.API_V2_URL}/mapping-lab/${labMappingData.kd_jenis_prw}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${tokenStore.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: updateData
+          }
+        )
+        console.log('Lab mapping updated successfully')
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          // Create new mapping if not found
+          try {
+            console.log('Creating new mapping with data:', labMappingData)
+            console.log('Stringified data:', JSON.stringify(labMappingData))
+
+            await $fetch(
+              `${config.public.API_V2_URL}/mapping-lab`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${tokenStore.accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: labMappingData
+              }
+            )
+            console.log('Lab mapping created successfully')
+          } catch (createError: any) {
+            console.error('Error creating lab mapping:', createError?.data || createError)
+            throw createError
+          }
+        } else {
+          console.error('Error checking/updating lab mapping:', error?.data || error)
+          throw error
+        }
+      }
+    }
+
+    // Juga simpan ke casemix/coding untuk konsistensi
+    try {
+      await $fetch(
+        `${config.public.API_V2_URL}/casemix/coding`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${tokenStore.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: {
+            no_sep: selectedVisitData.value?.no_sep,
+            no_rawat: selectedVisitData.value?.no_rawat,
+            mappings: [mapping],
+            catatan_koder: '',
+            status: 'draft'
+          }
+        }
+      )
+      console.log('Lab mapping saved to casemix successfully')
+
+      toast.add({
+        icon: 'i-tabler-check',
+        title: 'Success',
+        description: 'Mapping tersimpan di rsia_mapping_lab dan casemix',
+        color: 'green',
+        timeout: 2000
+      })
+    } catch (casemixError: any) {
+      console.error('Error saving lab mapping to casemix:', casemixError?.data || casemixError)
+      toast.add({
+        icon: 'i-tabler-alert-circle',
+        title: 'Warning',
+        description: 'Mapping tersimpan di rsia_mapping_lab, gagal sync ke casemix',
+        color: 'yellow'
+      })
+    }
+  } catch (err) {
+    console.error('Error saving lab mapping:', err)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal menyimpan mapping',
+      color: 'red'
+    })
+  }
+}
+
+/**
+ * Remove lab mapping
+ */
+async function removeLabMapping(mapping: any, index: number) {
+  try {
+    // Find and remove from soapMappings
+    const mappingIndex = soapMappings.value.findIndex(m =>
+      m.no_rawat === mapping.no_rawat &&
+      m.tgl_perawatan === mapping.tgl_perawatan &&
+      m.jam_rawat === mapping.jam_rawat &&
+      m.source_field === mapping.source_field &&
+      m.snomed_concept_id === mapping.snomed_concept_id
+    )
+
+    if (mappingIndex !== -1) {
+      soapMappings.value.splice(mappingIndex, 1)
+    }
+
+    // Hapus dari rsia_mapping_lab jika ada kd_jenis_prw
+    const currentLabItem = visitDetails.value?.lab?.find((lab: any) =>
+      lab.no_rawat === mapping.no_rawat &&
+      (lab.template?.Pemeriksaan === mapping.source_text || lab.jenis_perawatan?.nm_perawatan === mapping.source_text)
+    )
+
+    if (currentLabItem?.jenis_perawatan?.kd_jenis_prw) {
+      const { error: deleteError } = await useFetch(
+        `${config.public.API_V2_URL}/mapping-lab/${currentLabItem.jenis_perawatan.kd_jenis_prw}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${tokenStore.accessToken}`
+          }
+        }
+      )
+
+      if (deleteError.value) {
+        console.error('Error deleting lab mapping:', deleteError.value)
+        toast.add({
+          icon: 'i-tabler-alert-circle',
+          title: 'Warning',
+          description: 'Mapping dihapus secara lokal, gagal hapus dari server',
+          color: 'yellow'
+        })
+      } else {
+        toast.add({
+          icon: 'i-tabler-check',
+          title: 'Lab Mapping Dihapus',
+          description: 'Mapping berhasil dihapus dari rsia_mapping_lab',
+          color: 'green',
+          timeout: 2000
+        })
+      }
+    } else {
+      toast.add({
+        icon: 'i-tabler-trash',
+        title: 'Lab Mapping Dihapus',
+        color: 'orange',
+        timeout: 2000
+      })
+    }
+  } catch (err) {
+    console.error('Error removing lab mapping:', err)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal menghapus mapping',
+      color: 'red'
+    })
+  }
+}
+
+/**
+ * Get klaim status for badge
+ */
+function getKlaimStatusBadge(row: any): string {
+  const status = getKlaimStatus(row)
+  switch (status) {
+    case 'sent': return 'Sent'
+    case 'unsent': return 'Belum Sent'
+    case 'pending': return 'Pending'
+    default: return 'Tidak Tersedia'
+  }
+}
+
+/**
+ * Get klaim status color
+ */
+function getKlaimStatusColor(row: any): string {
+  const status = getKlaimStatus(row)
+  switch (status) {
+    case 'sent': return 'green'
+    case 'unsent': return 'yellow'
+    case 'pending': return 'orange'
+    default: return 'gray'
+  }
+}
+
+/**
+ * Get klaim status
+ */
+const klaimStatusMap = reactive<Record<string, string>>({})
+
+function getKlaimStatus(row: any): string {
+  const sep = row.no_sep
+
+  // If we've already processed this SEP, return cached result
+  if (klaimStatusMap[sep]) {
+    return klaimStatusMap[sep]
+  }
+
+  // Process status and cache it (client-side only)
+  if (import.meta.client && row?.rsia_klaim_idrg?.send_klaim_res) {
+    try {
+      const sendKlaimRes = row.rsia_klaim_idrg.send_klaim_res
+      const parsed = JSON.parse(sendKlaimRes)
+      const status = parsed.response?.data?.[0]?.kemkes_dc_status || 'unsent'
+      klaimStatusMap[sep] = status
+      return status
+    } catch {
+      klaimStatusMap[sep] = 'unsent'
+      return 'unsent'
+    }
+  }
+
+  return 'unsent'
+}
+
+async function fetchErmDetails(no_sep: string) {
+  isLoadingDetails.value = true
+  ermDetails.value = null
+  try {
+    const { data: detailsData, error } = await useFetch(
+      `${config.public.API_V2_URL}/erm/details/${no_sep}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if (error.value) {
+      console.error("Error fetching ERM details:", error.value)
+      // Show user-friendly error message
+      toast.add({
+        icon: 'i-tabler-circle-x',
+        title: 'Error',
+        description: 'Gagal memuat detail ERM. Hubungi administrator.',
+        color: 'red',
+        timeout: 5000
+      })
+      ermDetails.value = null
+    } else {
+      ermDetails.value = detailsData.value as any
+      console.log('Detail ERM:', ermDetails.value)
+    }
+
+  } catch (err) {
+    console.error("Exception fetching ERM details:", err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Terjadi kesalahan saat memuat detail ERM.',
+      color: 'red',
+      timeout: 5000
+    })
+    ermDetails.value = null
+  } finally {
+    isLoadingDetails.value = false
+  }
+}
+
+const generateAccordionItems = (fullResponseDetails: any) => {
+  // 1. Ekstrak bagian 'data' dari respons
+  const details = fullResponseDetails?.data;
+  console.log('Generating accordion items using extracted details:', details); // Log data yang diekstrak
+
+  // 2. Lakukan pengecekan pada 'details' yang sudah diekstrak
+  if (!details) return [];
+
+  const items = [];
+  // Gunakan 'details' (yang sudah berisi { registrasi: ..., diagnosa: ... })
+  if (details.diagnosa && details.diagnosa.length > 0) {
+    items.push({
+      label: 'Diagnosa',
+      icon: 'i-tabler-stethoscope',
+      defaultOpen: true,
+      slot: 'diagnosa'
+    });
+  }
+  if (details.prosedur && details.prosedur.length > 0) {
+    items.push({
+      label: 'Prosedur',
+      icon: 'i-tabler-activity-heartbeat',
+      slot: 'prosedur'
+    });
+  }
+  if (details.obat && details.obat.length > 0) {
+    items.push({ label: 'Obat', icon: 'i-tabler-pill', slot: 'obat' });
+  }
+  if (details.lab && details.lab.length > 0) {
+    items.push({ label: 'Laboratorium', icon: 'i-tabler-flask', slot: 'lab' });
+  }
+  if (details.radiologi && details.radiologi.length > 0) {
+    items.push({ label: 'Radiologi', icon: 'i-tabler-radioactive', slot: 'radiologi' });
+  }
+  if ((details.cppt_pemeriksaan && details.cppt_pemeriksaan.length > 0) || (details.cppt_catatan && details.cppt_catatan.length > 0) ) {
+    items.push({ label: 'CPPT', icon: 'i-tabler-notes', slot: 'cppt' });
+  }
+
+  console.log('Generated accordion items:', items); // Log hasil akhir
+  return items;
+}
+// ------------------------------------
+// Helper function to parse send_klaim_res and get kemkes_dc_status
+const getKemkesStatus = (sendKlaimResString: string | null | undefined): string | null => {
+  if (!sendKlaimResString) {
+    return null; // Return null if the string is empty or undefined
+  }
+  try {
+    const parsedRes = JSON.parse(sendKlaimResString);
+    // Safely access the nested property
+    const status = parsedRes?.response?.data?.[0]?.kemkes_dc_status;
+    return status || null; // Return the status or null if not found
+  } catch (e) {
+    console.error("Error parsing send_klaim_res JSON:", e);
+    return null; // Return null if JSON parsing fails
+  }
+};
+
+
+// Opsional: Fungsi untuk mengecek nilai abnormal (contoh sederhana)
+// Anda mungkin perlu logika yang lebih kompleks tergantung format nilai_rujukan
+const isNilaiAbnormal = (nilai: string, rujukan: string): boolean => {
+    try {
+        const numericNilai = parseFloat(nilai.replace(',', '.')); // Handle koma desimal
+        if (isNaN(numericNilai)) return false; // Bukan angka
+
+        // Coba parse rujukan (contoh: "10 - 20" atau "< 10" atau "> 20")
+        if (rujukan.includes('-')) {
+            const [min, max] = rujukan.split('-').map(s => parseFloat(s.trim().replace(',', '.')));
+            if (!isNaN(min) && !isNaN(max)) {
+                return numericNilai < min || numericNilai > max;
+            }
+        } else if (rujukan.startsWith('<')) {
+            const max = parseFloat(rujukan.substring(1).trim().replace(',', '.'));
+             if (!isNaN(max)) {
+                return numericNilai >= max;
+            }
+        } else if (rujukan.startsWith('>')) {
+             const min = parseFloat(rujukan.substring(1).trim().replace(',', '.'));
+             if (!isNaN(min)) {
+                return numericNilai <= min;
+            }
+        }
+        return false; // Tidak bisa menentukan
+    } catch {
+        return false; // Error parsing
+    }
+};
+
+// ========================================
+// UTILITY FUNCTIONS
+// ========================================
+function formatCurrency(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === '' || value === 'NaN') {
+    return 'Rp 0'
+  }
+
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+
+  if (isNaN(numValue) || !isFinite(numValue)) {
+    return 'Rp 0'
+  }
+
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(numValue)
+}
+
+function formatDate(date: string): string {
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  })
+}
+
+// ========================================
+// BILLING METHODS
+// ========================================
+async function loadProcedureBilling() {
+  console.log('loadProcedureBilling called, selectedVisitData:', selectedVisitData.value)
+  if (!selectedVisitData.value?.no_rawat) {
+    console.log('No no_rawat found in selectedVisitData')
+    return
+  }
+
+  console.log('Loading billing data for no_rawat:', selectedVisitData.value.no_rawat)
+  loadingBilling.value = true
+  try {
+    // Test with known working API first
+    const testResponse = await $fetch(`${config.public.API_V2_URL}/erm/details/${selectedVisitData.value.no_sep}`, {
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    console.log('Test API response:', testResponse)
+
+    // Load procedure billing data using full Laravel URL
+    const laravelBillingUrl = `${config.public.API_V2_URL}/procedure-billing?no_rawat=${selectedVisitData.value.no_rawat}`
+    console.log('Fetching billing from:', laravelBillingUrl)
+
+    const billingResponse = await $fetch(laravelBillingUrl, {
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('Billing data response:', billingResponse)
+    procedureBilling.value = billingResponse.data || []
+    console.log('Procedure billing set to:', procedureBilling.value)
+
+    // Load summary data
+    const summaryResponse = await $fetch(`${config.public.API_V2_URL}/procedure-billing/summary?no_rawat=${selectedVisitData.value.no_rawat}`, {
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    console.log('Summary response:', summaryResponse)
+    billingSummary.value = summaryResponse.data || {
+      total_procedures: 0,
+      total_biaya: 0,
+      by_jenis_petugas: [],
+      by_status_rawat: [],
+      by_status_bayar: []
+    }
+
+    // Load top procedures
+    const topProceduresResponse = await $fetch(`${config.public.API_V2_URL}/procedure-billing/top-procedures?no_rawat=${selectedVisitData.value.no_rawat}&limit=5`, {
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    topProcedures.value = topProceduresResponse.data || []
+
+  } catch (error) {
+    console.error('Error loading procedure billing:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Gagal memuat data tarif & tindakan',
+      color: 'red'
+    })
+  } finally {
+    loadingBilling.value = false
+  }
+}
+
+// ========================================
+// PROCEDURE MAPPING METHODS
+// ========================================
+
+function openProcedureMappingModal(procedure: any, existingMapping?: any) {
+  currentProcedure.value = procedure
+
+  // If editing existing mapping, populate with existing data
+  if (existingMapping && existingMapping.snomed) {
+    procedureMapping.value = {
+      kd_jenis_prw: procedure.kd_jenis_prw,
+      code: existingMapping.snomed.code || '',
+      system: existingMapping.snomed.system || 'http://snomed.info/sct',
+      display: existingMapping.snomed.display || '',
+      description: existingMapping.snomed.description || '',
+      status: existingMapping.status || 'active',
+      notes: existingMapping.notes || ''
+    }
+  } else {
+    // Create new mapping
+    procedureMapping.value = {
+      kd_jenis_prw: procedure.kd_jenis_prw,
+      code: '',
+      system: 'http://snomed.info/sct',
+      display: '',
+      description: '',
+      status: 'active',
+      notes: ''
+    }
+  }
+
+  // Auto-suggest based on procedure name
+  const procedureName = procedure.nm_perawatan.toLowerCase()
+
+  // Common keywords to suggest
+  if (procedureName.includes('dokter') || procedureName.includes('konsultasi')) {
+    return 'konsultasi'
+  } else if (procedureName.includes('administrasi') || procedureName.includes('regis')) {
+    return 'registration'
+  } else if (procedureName.includes('periksa') || procedureName.includes('check')) {
+    return 'examination'
+  } else if (procedureName.includes('kandungan') || procedureName.includes('kehamilan')) {
+    return 'obstetric'
+  } else if (procedureName.includes('operasi') || procedureName.includes('bedah')) {
+    return 'surgical'
+  } else if (procedureName.includes('suntik') || procedureName.includes('imunisasi')) {
+    return 'injection'
+  } else if (procedureName.includes('laboratorium') || procedureName.includes('lab')) {
+    return 'laboratory'
+  }
+
+  // Don't auto-fill or auto-trigger search to let user start with empty form
+  procedureSearchTerm.value = ''
+  procedureSearchResults.value = []
+  showProcedureMappingModal.value = true
+}
+
+const searchProcedureSnomed = useDebounceFn(async () => {
+  const term = procedureSearchTerm.value
+
+  if (!term || term.length < 2 || procedureMapping.value.system !== 'http://snomed.info/sct') {
+    procedureSearchResults.value = []
+    return
+  }
+
+  searchingProcedureSnomed.value = true
+
+  try {
+    // Use the same SNOMED API as lab search but with procedure-related semantic tags
+    const semanticTags = ['procedure', 'event', 'act', 'observable-entity', 'substance', 'specimen']
+
+    const { data, error } = await useFetch(
+      `${config.public.API_V2_URL}/casemix/snomed/search`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          term: term,
+          semantic_tags: semanticTags,
+          limit: 10
+        })
+      }
+    )
+
+    if (error.value) {
+      console.error('SNOMED search error:', error.value)
+      procedureSearchResults.value = []
+      toast.add({
+        title: 'Error',
+        description: 'Gagal mencari SNOMED CT codes',
+        color: 'red'
+      })
+    } else {
+      // Transform API response to match expected format
+      const results = data.value?.data || []
+      procedureSearchResults.value = results.map((item: any) => ({
+        code: item.snomed_concept_id?.toString() || item.concept_id?.toString() || item.code,
+        display: item.snomed_term || item.term || item.display,
+        description: item.snomed_fsn || item.fsn || item.description
+      }))
+    }
+  } catch (err) {
+    console.error('Exception during SNOMED search:', err)
+    procedureSearchResults.value = []
+    toast.add({
+      title: 'Error',
+      description: 'Gagal mencari SNOMED CT codes',
+      color: 'red'
+    })
+  } finally {
+    searchingProcedureSnomed.value = false
+  }
+}, 500)
+
+function selectProcedureSnomed(result: any) {
+  procedureMapping.value.code = result.code
+  procedureMapping.value.display = result.display
+  procedureMapping.value.description = result.description || ''
+  procedureSearchTerm.value = `${result.code} - ${result.display}`
+  procedureSearchResults.value = []
+}
+
+async function saveProcedureMapping() {
+  if (!procedureMapping.value.code || !procedureMapping.value.display) {
+    toast.add({
+      title: 'Error',
+      description: 'Kode SNOMED dan Display Name wajib diisi',
+      color: 'red'
+    })
+    return
+  }
+
+  savingProcedureMapping.value = true
+  try {
+    // Check if this is an update (existing mapping) or create
+    const isUpdate = procedureMapping.value.code && procedureMapping.value.kd_jenis_prw
+    const method = isUpdate ? 'PUT' : 'POST'
+    const url = isUpdate
+      ? `${config.public.API_V2_URL}/procedure-mapping/${procedureMapping.value.kd_jenis_prw}`
+      : `${config.public.API_V2_URL}/procedure-mapping`
+
+    const response = await $fetch(url, {
+      method,
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(procedureMapping.value)
+    })
+
+    console.log('Procedure mapping save response:', response)
+
+    // If we get here (no error thrown), the save was successful
+    toast.add({
+      title: 'Success',
+      description: `SNOMED mapping berhasil ${isUpdate ? 'diperbarui' : 'disimpan'}`,
+      color: 'green'
+    })
+    showProcedureMappingModal.value = false
+
+    // Refresh procedure billing to show updated mapping
+    if (selectedVisitData.value?.no_rawat) {
+      await loadProcedureBilling()
+    }
+  } catch (error) {
+    console.error('Error saving procedure mapping:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Gagal menyimpan SNOMED mapping',
+      color: 'red'
+    })
+  } finally {
+    savingProcedureMapping.value = false
+  }
+}
+
+// Load procedure mapping data for billing display
+async function loadProcedureMappings() {
+  if (!procedureBilling.value || procedureBilling.value.length === 0) return
+
+  try {
+    const kdJenisPrws = procedureBilling.value.map((p: any) => p.kd_jenis_prw)
+
+    // Get existing mappings
+    const mappingPromises = kdJenisPrws.map(async (kdJenisPrw: string) => {
+      try {
+        const response = await $fetch(`${config.public.API_V2_URL}/procedure-mapping/${kdJenisPrw}`, {
+          headers: {
+            'Authorization': `Bearer ${tokenStore.accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        return { kdJenisPrw, mapping: response.data }
+      } catch (error) {
+        return { kdJenisPrw, mapping: null }
+      }
+    })
+
+    const mappings = await Promise.all(mappingPromises)
+
+    // Merge mapping data into procedure billing
+    procedureBilling.value = procedureBilling.value.map((procedure: any) => {
+      const mappingData = mappings.find(m => m.kdJenisPrw === procedure.kd_jenis_prw)
+      return {
+        ...procedure,
+        snomed_mapping: mappingData?.mapping || null
+      }
+    })
+
+  } catch (error) {
+    console.error('Error loading procedure mappings:', error)
+  }
+}
+
+// Update loadProcedureBilling to also load mappings
+const originalLoadProcedureBilling = loadProcedureBilling
+async function loadProcedureBillingWithMappings() {
+  await originalLoadProcedureBilling()
+  await loadProcedureMappings()
+}
+
+// Replace the original function reference
+loadProcedureBilling = loadProcedureBillingWithMappings
+
+// ========================================
+// BPJS SUBMISSION METHODS
+// ========================================
+
+async function sendToBpjs() {
+  if (!selectedVisitData.value?.no_sep || !selectedVisitData.value?.no_rawat) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Data kunjungan tidak lengkap',
+      color: 'red'
+    })
+    bpjsSubmissionStatus.value = 'error'
+    setTimeout(() => { bpjsSubmissionStatus.value = 'idle' }, 3000)
+    return
+  }
+
+  sendingToBpjs.value = true
+  bpjsSubmissionStatus.value = 'sending'
+
+  try {
+    // 1. Ensure visit details are loaded before generating FHIR Bundle
+    if (!visitDetails.value || !visitDetails.value.pasien) {
+      toast.add({
+        icon: 'i-tabler-loader-2',
+        title: 'Loading',
+        description: 'Memuat data pasien...',
+        color: 'blue'
+      })
+      await fetchVisitDetails(selectedVisitData.value.no_sep)
+    }
+
+    // 2. Generate FHIR Bundle
+    const fhirBundle = await generateFhirBundle()
+
+    
+    // 3. Prepare BPJS request payload
+    const currentDate = new Date()
+    const payload = {
+      request: {
+        noSep: selectedVisitData.value.no_sep,
+        jnsPelayanan: selectedVisitData.value.jnspelayanan === 'Ralan' ? '2' : '1', // 1. Rawat Inap, 2. Rawat Jalan
+        bulan: String(currentDate.getMonth() + 1).padStart(2, '0'),
+        tahun: String(currentDate.getFullYear()),
+        dataMR: fhirBundle
+      }
+    }
+
+    console.log('Sending to BPJS:', payload)
+    console.log('Selected visit data:', selectedVisitData.value)
+    console.log('SEP from visit data:', selectedVisitData.value?.no_sep)
+    console.log('Jns Pelayanan from visit data:', selectedVisitData.value?.jnspelayanan)
+
+    // 3. Send to BPJS API
+    const response = await $fetch(`${config.public.API_V2_URL}/bpjs/rekammedis/insert`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    })
+
+    console.log('BPJS Response:', response)
+
+    if (response && response.message) {
+      // Check BPJS response for actual status
+      const bpjsMetadata = response.bpjs_response?.metadata;
+      const isActuallySuccess = bpjsMetadata?.code === '200';
+
+      if (isActuallySuccess || bpjsMetadata?.message === 'Data Tidak Ditemukan') {
+        // Show different message for testing vs success
+        const description = bpjsMetadata?.message === 'Data Tidak Ditemukan'
+          ? 'Data berhasil dikirim ke BPJS (SEP testing)'
+          : 'Data berhasil dikirim ke BPJS';
+
+        toast.add({
+          icon: 'i-tabler-check',
+          title: 'Berhasil',
+          description,
+          color: 'green'
+        })
+        bpjsSubmissionStatus.value = 'success'
+      } else {
+        // Show warning if BPJS returned error
+        toast.add({
+          icon: 'i-tabler-alert-triangle',
+          title: 'Warning',
+          description: `BPJS Response: ${bpjsMetadata?.message || 'Unknown error'}`,
+          color: 'orange'
+        })
+        bpjsSubmissionStatus.value = 'error'
+      }
+      // Reset status after 3 seconds
+      setTimeout(() => { bpjsSubmissionStatus.value = 'idle' }, 3000)
+    } else {
+      throw new Error('Invalid response from BPJS API')
+    }
+
+  } catch (error) {
+    console.error('Error sending to BPJS:', error)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal mengirim data ke BPJS',
+      color: 'red'
+    })
+    bpjsSubmissionStatus.value = 'error'
+    // Reset status after 3 seconds
+    setTimeout(() => { bpjsSubmissionStatus.value = 'idle' }, 3000)
+  } finally {
+    sendingToBpjs.value = false
+  }
+}
+
+// Helper function to generate UUID
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
+
+// Load hospital setting from backend
+async function loadHospitalSetting() {
+  try {
+    const tokenStore = useAccessTokenStore()
+    const response = await $fetch(`${config.public.API_V2_URL}/bpjs/setting-info`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+    return response.controller_properties
+  } catch (error) {
+    console.error('Error loading hospital setting:', error)
+    // Fallback to default values
+    return {
+      nama_instansi: 'RSIA Aisyiyah Pekajangan',
+      kode_faskes_bpjs: '0166R001',
+      kode_kemenkes: '3326051'
+    }
+  }
+}
+
+// Load patient data with address relations
+async function loadPatientDataWithAddress(no_rkm_medis: string) {
+  try {
+    const response = await $fetch(`/api/v1/pasien/${no_rkm_medis}/address-relations`)
+    return response.data || {}
+  } catch (error) {
+    console.error('Error loading patient address data:', error)
+    return {}
+  }
+}
+
+  // The patient data is in visitDetails.value.registrasi structure
+  const patientData = visitDetails.value?.registrasi?.pasien || visitDetails.value?.pasien
+  const regPeriksaData = visitDetails.value?.registrasi || visitDetails.value?.reg_periksa
+
+  let patientAddressData = {}
+  if (patientData?.no_rkm_medis) {
+    patientAddressData = await loadPatientDataWithAddress(patientData.no_rkm_medis)
+  }
+
+  const data = {
+    ...selectedVisitData.value,
+    ...regPeriksaData,
+    ...patientData,
+    ...patientAddressData,
+    // Handle missing fields with fallbacks
+    no_peserta: selectedVisitData.value?.no_kartu || regPeriksaData?.no_peserta || patientData?.no_peserta || ''
+  }
+
+  // Load hospital settings
+  const hospitalSetting = await loadHospitalSetting()
+  const {
+    kode_faskes_bpjs: kodeFaskesBpjs = '0166R001',
+    kode_kemenkes: kodeKemenkes = '3326051',
+    nama_instansi: namaRumahSakit = 'RSIA Aisyiyah Pekajangan'
+  } = hospitalSetting
+
+  const jnsPelayanan = data.jnspelayanan === 'Ralan' ? '2' : '1' // 1=Ranap, 2=Ralan
+  const bundleId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+
+  // Simple bundle with only essential resources
+  const bundle = {
+    resourceType: 'Bundle',
+    id: bundleId,
+    meta: {
+      lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 19)
+    },
+    identifier: {
+      use: null,
+      type: {
+        coding: [],
+        text: null
+      },
+      system: 'SEP',
+      value: data.no_sep || 'SEP001',
+      assigner: {
+        display: null
+      }
+    },
+    type: 'Document',
+    entry: []
+  }
+
+  // Add Patient Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Patient',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      identifier: [
+        {
+          use: 'usual',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MR', display: null }
+            ],
+            text: ""
+          },
+          system: null,
+          value: data.no_rkm_medis,
+          assigner: { display: namaRumahSakit }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MB', display: null }
+            ],
+            text: 'Nomor Peserta BPJS Kesehatan'
+          },
+          system: null,
+          value: data.no_peserta || '',
+          assigner: { display: 'BPJS Kesehatan' }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'NNIDN', display: null }
+            ],
+            text: 'NIK'
+          },
+          system: null,
+          value: data.no_ktp || '',
+          assigner: { display: 'KEMENDAGRI' }
+        }
+      ],
+      active: true,
+      name: [{ use: 'official', text: data.nm_pasien || data.nama_pasien || 'Unknown Patient' }],
+      maritalStatus: {
+        coding: [
+          { system: 'http://terminology.hl7.org/CodeSystem/v3-MaritalStatus', code: data.stts_nikah === 'M' ? 'M' : 'U' }
+        ],
+        text: null
+      },
+      telecom: [
+        {
+          system: 'phone',
+          value: data.no_tlp || '000000000000',
+          use: 'mobile'
+        }
+      ],
+      gender: data.jk === 'L' ? 'male' : 'female',
+      birthDate: data.tgl_lahir ? new Date(data.tgl_lahir).toISOString().split('T')[0] : '1980-01-01',
+      deceasedBoolean: false,
+      address: [{
+        use: 'home',
+        type: 'both',
+        text: data.alamat || '',
+        line: [data.alamat || ''],
+        city: data.nm_kab || data.kabupatenpj || data.kabupaten || 'KABUPATEN PEKALONGAN',
+        district: data.nm_kec || data.kecamatanpj || data.kecamatan || 'KEDUNGWUNI',
+        state: data.nm_prop || data.propinsipj || data.propinsi || 'JAWA TENGAH',
+        postalCode: data.kode_pos || '51161',
+        country: 'Indonesia'
+      }],
+      managingOrganization: {
+        other: `Organization/${kodeFaskesBpjs}`,
+        reference: `Organization/${kodeFaskesBpjs}`,
+        type: namaRumahSakit,
+        display: namaRumahSakit
+      }
+    }
+  })
+
+  // Add Organization Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Organization',
+      id: kodeFaskesBpjs,
+      identifier: [{
+        use: 'official',
+        type: { coding: [], text: null },
+        system: null,
+        value: kodeFaskesBpjs,
+        assigner: { display: null }
+      }],
+      type: [{
+        coding: [{
+          system: 'http://hl7.org/fhir/organization-type',
+          code: 'prov',
+          display: 'Healthcare Provider'
+        }],
+        text: namaRumahSakit
+      }],
+      name: namaRumahSakit,
+      alias: [namaRumahSakit]
+    }
+  })
+
+  // Add Practitioner Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Practitioner',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      identifier: [{
+        use: 'official',
+        type: { coding: [], text: null },
+        system: null,
+        value: data.kd_dokter || 'DOK001',
+        assigner: { display: null }
+      }],
+      name: [{
+        use: 'official',
+        text: data.nm_dokter || data.dokter || 'Dokter'
+      }]
+    }
+  })
+
+  // Store IDs for references
+  const patientId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+  const organizationId = kodeFaskesBpjs
+  const practitionerId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+  const encounterId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+  const compositionId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+
+  // Add Patient Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Patient',
+      id: patientId,
+      identifier: [
+        {
+          use: 'usual',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MR', display: null }
+            ],
+            text: ""
+          },
+          system: null,
+          value: data.no_rkm_medis,
+          assigner: { display: namaRumahSakit }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MB', display: null }
+            ],
+            text: 'Nomor Peserta BPJS Kesehatan'
+          },
+          system: null,
+          value: data.no_peserta || '',
+          assigner: { display: 'BPJS Kesehatan' }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'NNIDN', display: null }
+            ],
+            text: 'NIK'
+          },
+          system: null,
+          value: data.no_ktp || '',
+          assigner: { display: 'KEMENDAGRI' }
+        }
+      ],
+      active: true,
+      name: [{ use: 'official', text: data.nm_pasien || data.nama_pasien || 'Unknown Patient' }],
+      maritalStatus: {
+        coding: [
+          { system: 'http://terminology.hl7.org/CodeSystem/v3-MaritalStatus', code: data.stts_nikah === 'M' ? 'M' : 'U' }
+        ],
+        text: null
+      },
+      telecom: [
+        {
+          system: 'phone',
+          value: data.no_tlp || '000000000000',
+          use: 'mobile'
+        }
+      ],
+      gender: data.jk === 'L' ? 'male' : 'female',
+      birthDate: data.tgl_lahir ? new Date(data.tgl_lahir).toISOString().split('T')[0] : '1980-01-01',
+      deceasedBoolean: false,
+      address: [{
+        use: 'home',
+        type: 'both',
+        text: data.alamat || '',
+        line: [data.alamat || ''],
+        city: data.nm_kab || data.kabupatenpj || data.kabupaten || 'KABUPATEN PEKALONGAN',
+        district: data.nm_kec || data.kecamatanpj || data.kecamatan || 'KEDUNGWUNI',
+        state: data.nm_prop || data.propinsipj || data.propinsi || 'JAWA TENGAH',
+        postalCode: data.kode_pos || '51161',
+        country: 'Indonesia'
+      }],
+      managingOrganization: {
+        other: `Organization/${organizationId}`,
+        reference: `Organization/${organizationId}`,
+        type: namaRumahSakit,
+        display: namaRumahSakit
+      }
+    }
+  })
+
+  // Add Organization Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Organization',
+      id: organizationId,
+      identifier: [{
+        use: 'official',
+        type: { coding: [], text: null },
+        system: null,
+        value: organizationId,
+        assigner: { display: null }
+      }],
+      type: [{
+        coding: [{
+          system: 'http://hl7.org/fhir/organization-type',
+          code: 'prov',
+          display: 'Healthcare Provider'
+        }],
+        text: namaRumahSakit
+      }],
+      name: namaRumahSakit,
+      alias: [namaRumahSakit]
+    }
+  })
+
+  // Add Practitioner Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Practitioner',
+      id: practitionerId,
+      identifier: [{
+        use: 'official',
+        type: { coding: [], text: null },
+        system: null,
+        value: data.kd_dokter || 'DOK001',
+        assigner: { display: null }
+      }],
+      name: [{
+        use: 'official',
+        text: data.nm_dokter || data.dokter || 'Dokter'
+      }]
+    }
+  })
+
+  // Add Encounter Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Encounter',
+      id: encounterId,
+      identifier: [{
+        use: null,
+        type: { coding: [], text: null },
+        system: 'http://api.bpjs-kesehatan.go.id:8080/Vclaim-rest/SEP/',
+        value: data.no_sep,
+        assigner: { display: null }
+      }],
+      status: 'finished',
+      class: {
+        system: 'http://hl7.org/fhir/v3/ActCode',
+        code: jnsPelayanan === '1' ? 'IMP' : 'AMB',
+        display: jnsPelayanan === '1' ? 'inpatient encounter' : 'ambulatory encounter'
+      },
+      subject: {
+        reference: `Patient/${patientId}`,
+        display: data.nm_pasien,
+        noSep: data.no_sep
+      },
+      serviceProvider: {
+        reference: `Organization/${organizationId}`,
+        display: namaRumahSakit
+      },
+      period: {
+        start: data.tgl_registrasi ? new Date(data.tgl_registrasi).toISOString() : new Date().toISOString(),
+        end: data.tgl_keluar ? new Date(data.tgl_keluar).toISOString() : new Date().toISOString()
+      }
+    }
+  })
+
+  // Add Composition Resource
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Composition',
+      id: compositionId,
+      status: 'final',
+      type: {
+        coding: [
+          { system: 'http://loinc.org', code: '81218-0' }
+        ],
+        text: 'Discharge Summary'
+      },
+      subject: {
+        reference: `Patient/${patientId}`,
+        display: data.nm_pasien || data.nama_pasien || 'Unknown Patient'
+      },
+      encounter: {
+        reference: `Encounter/${encounterId}`
+      },
+      date: new Date().toISOString(),
+      author: [
+        {
+          reference: `Practitioner/${practitionerId}`,
+          display: data.nm_dokter || data.dokter || 'Dokter'
+        }
+      ],
+      title: 'Discharge Summary',
+      confidentiality: 'N',
+      section: {
+        '1': {
+          title: 'Reason for admission',
+          code: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '29299-5',
+                display: 'Reason for visit Narrative'
+              }
+            ],
+            text: null
+          },
+          text: {
+            status: 'additional',
+            div: data.keluhan || 'Tidak ada keluhan khusus'
+          },
+          mode: 'working',
+          entry: {
+            reference: `Encounter/${encounterId}`
+          }
+        }
+      }
+    }
+  })
+
+  return bundle
+}
+
+// Generate FHIR Bundle from ERM data (using the complete version)
+// Note: Commented out the simplified version, reverting to the full version
+async function generateFhirBundle() {
+  // The patient data is in visitDetails.value.registrasi structure
+  const patientData = visitDetails.value?.registrasi?.pasien || visitDetails.value?.pasien
+  const regPeriksaData = visitDetails.value?.registrasi || visitDetails.value?.reg_periksa
+
+  const data = {
+    ...selectedVisitData.value,
+    ...regPeriksaData,
+    ...patientData,
+    // Handle missing fields with fallbacks
+    no_peserta: selectedVisitData.value?.no_kartu || regPeriksaData?.no_peserta || patientData?.no_peserta || ''
+  }
+
+
+  // Load hospital setting dynamically
+  const hospitalSetting = await loadHospitalSetting()
+  console.log('Hospital setting loaded:', hospitalSetting)
+
+  const kodeFaskesBpjs = hospitalSetting.kode_faskes_bpjs || '0166R001'
+  const kodeKemenkes = hospitalSetting.kode_kemenkes || '3326051'
+  const namaRumahSakit = hospitalSetting.nama_instansi || 'RSIA AISYIYAH PEKAJANGAN'
+
+  console.log('Using hospital data:', {
+    kodeFaskesBpjs,
+    kodeKemenkes,
+    namaRumahSakit,
+    alamat: hospitalSetting.alamat_instansi,
+    kabupaten: hospitalSetting.kabupaten,
+    kontak: hospitalSetting.kontak
+  })
+
+  const jnsPelayanan = data.jnspelayanan === 'Ralan' ? '2' : '1' // 1=Ranap, 2=Ralan
+
+  const bundleId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+
+  const bundle = {
+    resourceType: 'Bundle',
+    id: bundleId,
+    meta: {
+      lastUpdated: new Date().toISOString().replace('T', ' ').slice(0, 19)
+    },
+    identifier: {
+      use: null,
+      type: {
+        coding: [],
+        text: null
+      },
+      system: 'SEP',
+      value: data.no_sep || 'SEP001',
+      assigner: {
+        display: null
+      }
+    },
+    type: 'Document',
+    entry: []
+  }
+
+  // Add Patient Resource (BPJS exact format)
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Patient',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      identifier: [
+        {
+          use: 'usual',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MR' }
+            ]
+          },
+          value: data.no_rkm_medis,
+          assigner: { display: namaRumahSakit }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'MB' }
+            ]
+          },
+          value: data.no_peserta || '',
+          assigner: { display: 'BPJS KESEHATAN' }
+        },
+        {
+          use: 'official',
+          type: {
+            coding: [
+              { system: 'http://hl7.org/fhir/v2/0203', code: 'NNIDN' }
+            ]
+          },
+          value: data.no_ktp || '',
+          assigner: { display: 'KEMENDAGRI' }
+        }
+      ],
+      active: true,
+      name: [{ use: 'official', text: data.nm_pasien || data.nama_pasien || 'Unknown Patient' }],
+      maritalStatus: {
+        coding: [
+          { system: 'http://hl7.org/fhir/v3/MaritalStatus', code: data.stts_nikah === 'M' ? 'M' : 'U' }
+        ]
+      },
+      telecom: [
+        { system: 'phone', value: data.no_tlp || '', use: 'mobile' }
+      ],
+      gender: data.jk === 'L' ? 'male' : 'female',
+      birthDate: data.tgl_lahir || null,
+      deceasedBoolean: false,
+      address: [
+        {
+          line: [data.alamat || 'Alamat Pasien'],
+          city: data.nm_kab || data.kabupatenpj || data.kabupaten || 'Kabupaten',
+          district: data.nm_kec || data.kecamatanpj || data.kecamatan || 'Kecamatan',
+          state: data.nm_prop || data.propinsipj || data.propinsi || 'Provinsi',
+          postalCode: data.kd_pos || '00000',
+          text: data.alamat || 'Alamat Pasien',
+          use: 'home',
+          type: 'both'
+        }
+      ],
+      managingOrganization: {
+        reference: `Organization/${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+        display: data.nm_poli || namaRumahSakit
+      }
+    }
+  })
+
+  // Add Organization Resource (complete format like BPJS request)
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Organization',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      identifier: [
+        {
+          use: 'official',
+          type: { coding: [], text: null },
+          system: 'urn:oid:bpjs',
+          value: kodeFaskesBpjs,
+          assigner: { display: null }
+        },
+        {
+          use: 'official',
+          type: { coding: [], text: null },
+          system: 'urn:oid:KEMKES',
+          value: kodeKemenkes,
+          assigner: { display: null }
+        }
+      ],
+      type: [
+        {
+          coding: [
+            {
+              system: 'http://hl7.org/fhir/organization-type',
+              code: 'prov',
+              display: 'Healthcare Provider'
+            }
+          ],
+          text: namaRumahSakit
+        }
+      ],
+      name: namaRumahSakit,
+      alias: [namaRumahSakit],
+      telecom: (hospitalSetting.kontak || data.kontak) ? [
+        { system: 'phone', value: hospitalSetting.kontak || data.kontak, use: 'work' }
+      ] : [],
+      address: [
+        {
+          use: 'work',
+          type: 'physical',
+          text: hospitalSetting.alamat_instansi || 'Jl. Pekajangan No. 123',
+          line: [hospitalSetting.alamat_instansi || 'Jl. Pekajangan No. 123'],
+          city: hospitalSetting.kabupaten || 'Kabupaten Pekalongan',
+          district: hospitalSetting.kecamatan || 'Kecamatan Kedungwuni',
+          state: hospitalSetting.propinsi || 'Provinsi Jawa Tengah',
+          postalCode: hospitalSetting.kode_pos || '51161',
+          country: 'IDN'
+        }
+      ],
+      contact: [
+        {
+          purpose: {
+            coding: [
+              {
+                system: 'https://www.hl7.org/fhir/codesystem-contactentity-type.html',
+                code: 'PATINF',
+                display: null
+              }
+            ],
+            text: 'Operator'
+          },
+          telecom: (hospitalSetting.kontak || data.kontak) ? [
+            { system: 'phone', value: hospitalSetting.kontak || data.kontak, use: 'work' }
+          ] : [
+            { system: 'phone', value: '(0285) 1234567', use: 'work' }
+          ]
+        }
+      ]
+    }
+  })
+
+  // Add Practitioner Resource (Doctor) - complete format like BPJS request
+  if (data.dpjp) {
+    bundle.entry.push({
+      resource: {
+        resourceType: 'Practitioner',
+        id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+        identifier: [
+          {
+            use: 'official',
+            type: { coding: [], text: null },
+            system: 'urn:oid:nomor_sip',
+            value: data.no_sip || '',
+            assigner: { display: null }
+          },
+          {
+            use: 'official',
+            type: {
+              coding: [
+                {
+                  system: 'http://hl7.org/fhir/v2/0203',
+                  code: 'NNIDN',
+                  display: null
+                }
+              ],
+              text: null
+            },
+            system: null,
+            value: data.no_nik_dokter || '',
+            assigner: { display: 'KEMENDAGRI' }
+          }
+        ],
+        name: [{ use: 'official', text: data.dpjp }],
+        telecom: [
+          { system: 'phone', value: data.telp_dokter || '', use: 'work' },
+          { system: 'email', value: data.email_dokter || '', use: 'work' },
+          { system: 'fax', value: '', use: 'work' }
+        ],
+        address: [
+          {
+            use: 'home',
+            type: 'physical',
+            text: data.alamat_dokter || '',
+            line: [data.alamat_dokter || ''],
+            city: data.kota_dokter || '',
+            district: data.kecamatan_dokter || '',
+            state: data.propinsi_dokter || '',
+            postalCode: data.kd_pos_dokter || '',
+            country: ''
+          }
+        ],
+        gender: data.jk_dokter === 'L' ? 'MALE' : 'FEMALE',
+        birthDate: data.tgl_lahir_dokter ? new Date(data.tgl_lahir_dokter).toISOString() : null
+      }
+    })
+  }
+
+  // Add Encounter Resource (BPJS exact format)
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Encounter',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      identifier: [
+        {
+          use: null,
+          type: { coding: [], text: null },
+          system: 'http://api.bpjs-kesehatan.go.id:8080/Vclaim-rest/SEP/',
+          value: data.no_sep,
+          assigner: { display: null }
+        }
+      ],
+      subject: {
+        reference: `Patient/${bundle.entry[0].resource.id}`,
+        display: data.nm_pasien,
+        noSep: data.no_sep
+      },
+      class: {
+        system: 'http://hl7.org/fhir/v3/ActCode',
+        code: data.jnspelayanan === 'Ralan' ? 'AMB' : 'IMP',
+        display: data.jnspelayanan === 'Ralan' ? 'ambulatory' : 'inpatient encounter'
+      },
+      incomingReferral: data.no_rujukan ? [
+        {
+          identifier: [
+            {
+              use: null,
+              type: { coding: [], text: null },
+              system: 'nomor_rujukan_bpjs',
+              value: data.no_rujukan,
+              assigner: { display: null }
+            }
+          ]
+        }
+      ] : [],
+      reason: data.kd_penyakit ? [
+        {
+          coding: [
+            {
+              system: 'http://hl7.org/fhir/sid/icd-10',
+              code: data.kd_penyakit,
+              display: data.diagnosa || data.penyakit || 'Diagnosis'
+            }
+          ],
+          text: data.diagnosa || data.penyakit || 'Diagnosis'
+        }
+      ] : [],
+      hospitalization: {
+        dischargeDisposition: [
+          {
+            coding: [
+              {
+                system: 'http://hl7.org/fhir/discharge-disposition',
+                code: 'home',
+                display: 'Home'
+              }
+            ],
+            text: null
+          }
+        ]
+      },
+      period: {
+        start: data.tgl_registrasi ? new Date(data.tgl_registrasi).toISOString() : new Date().toISOString(),
+        end: new Date().toISOString()
+      },
+      status: 'finished',
+      text: {
+        div: data.stts_pulang || 'Pulang Diijinkan Dokter',
+        status: 'generated'
+      },
+      diagnosis: [] // Will be populated after Condition resources are created
+    }
+  })
+
+  // Add SOAP Procedures (from procedure billing)
+  if (procedureBilling.value && procedureBilling.value.length > 0) {
+    const procedures = []
+
+    procedureBilling.value.forEach(procedure => {
+      if (procedure.snomed_mapping?.has_mapping) {
+        procedures.push({
+          resourceType: 'Procedure',
+          id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+          text: {
+            status: 'completed',
+            div: '<div></div>'
+          },
+          status: 'completed',
+          code: {
+            coding: [
+              {
+                system: 'http://snomed.info/sct',
+                code: procedure.snomed_mapping.snomed.code,
+                display: procedure.snomed_mapping.snomed.display
+              }
+            ],
+            text: null
+          },
+          subject: {
+            type: null,
+            identifier: {
+              use: null,
+              type: { coding: [], text: null },
+              system: null,
+              value: data.no_rkm_medis,
+              assigner: { display: null }
+            },
+            display: data.nm_pasien,
+            reference: `Patient/${bundle.entry[0].resource.id}`
+          },
+          performedPeriod: {
+            start: procedure.tgl_perawatan ? new Date(procedure.tgl_perawatan).toISOString() : new Date().toISOString(),
+            end: procedure.tgl_perawatan ? new Date(procedure.tgl_perawatan).toISOString() : new Date().toISOString()
+          },
+          performer: [
+            {
+              function: {
+                coding: [
+                  {
+                    system: 'http://hl7.org/fhir/v2/0912',
+                    code: 'primary',
+                    display: 'Primary Physician'
+                  }
+                ]
+              },
+              actor: {
+                reference: `Practitioner/${bundle.entry[2].resource.id}`,
+                display: data.nm_dokter || data.dokter || 'Dokter'
+              }
+            }
+          ],
+          bodySite: [],
+          focalDevice: [],
+          note: [{ text: procedure.keterangan || '' }]
+        })
+      }
+    })
+
+    // Add individual procedures as separate entries
+    if (procedures.length > 0) {
+      procedures.forEach(procedure => {
+        bundle.entry.push({
+          resource: procedure
+        })
+      })
+    }
+  }
+
+  // Add Lab Results (DiagnosticReport)
+  if (visitDetails.pemeriksaan_lab && visitDetails.pemeriksaan_lab.length > 0) {
+    const diagnosticReports = []
+
+    visitDetails.pemeriksaan_lab.forEach(lab => {
+      const observations = []
+
+      if (lab.hasil) {
+        // Parse lab results and create observations
+        const labResults = parseLabResults(lab.hasil)
+        labResults.forEach(result => {
+          observations.push({
+            resourceType: 'Observation',
+            status: 'final',
+            code: {
+              coding: result.coding || [],
+              text: result.testName
+            },
+            valueQuantity: {
+              value: result.value,
+              unit: result.unit || ''
+            }
+          })
+        })
+      }
+
+      diagnosticReports.push({
+        resourceType: 'DiagnosticReport',
+        subject: {
+          reference: `Patient/${(bundle.entry[0] as any).resource?.id || generateUUID()}`,
+          display: data.nm_pasien,
+          noSep: data.no_sep
+        },
+        status: 'final',
+        result: observations
+      })
+    })
+
+    // Add diagnostic reports as an array in entry
+    if (diagnosticReports.length > 0) {
+      bundle.entry.push({
+        resource: diagnosticReports
+      })
+    }
+  }
+
+  // Add Composition Resource (BPJS exact format)
+  bundle.entry.push({
+    resource: {
+      resourceType: 'Composition',
+      id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+      status: 'final',
+      type: {
+        coding: [
+          { system: 'http://loinc.org', code: '81218-0' }
+        ],
+        text: 'Discharge Summary'
+      },
+      subject: {
+        reference: `Patient/${(bundle.entry[0] as any).resource?.id || generateUUID()}`,
+        display: data.nm_pasien || data.nama_pasien || 'Unknown Patient'
+      },
+      encounter: {
+        reference: `Encounter/${bundle.entry.find((e: any) => e.resource?.resourceType === 'Encounter')?.resource?.id || generateUUID()}`
+      },
+      date: new Date().toISOString(),
+      author: [
+        {
+          reference: `Practitioner/${(bundle.entry[2] as any).resource?.id || generateUUID()}`,
+          display: data.nm_dokter || data.dokter || 'Dokter'
+        }
+      ],
+      title: 'Discharge Summary',
+      confidentiality: 'N',
+      section: {
+        '1': {
+          title: 'Reason for admission',
+          code: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '29299-5',
+                display: 'Reason for visit Narrative'
+              }
+            ],
+            text: null
+          },
+          text: {
+            status: 'additional',
+            div: data.keluhan || 'Tidak ada keluhan khusus'
+          },
+          mode: 'working',
+          entry: {
+            reference: `Encounter/${bundle.entry.find((e: any) => e.resource?.resourceType === 'Encounter')?.resource?.id || generateUUID()}`
+          }
+        },
+        '2': {
+          title: 'Discharge Diagnosis',
+          code: {
+            coding: [
+              {
+                system: 'http://loinc.org',
+                code: '11535-2',
+                display: 'Hospital Discharge Diagnosis'
+              }
+            ],
+            text: null
+          },
+          text: {
+            status: 'additional',
+            div: data.diagnosa || 'Tidak ada diagnosa'
+          },
+          mode: 'working',
+          entry: {
+            reference: `Encounter/${bundle.entry.find((e: any) => e.resource?.resourceType === 'Encounter')?.resource?.id || generateUUID()}`
+          }
+        }
+      }
+    }
+  })
+
+  // Add Condition Resources (BPJS exact format - from diagnoses)
+  if (data.diagnosa || data.penyakit) {
+    const diagnosisText = data.diagnosa || data.penyakit || ''
+
+    // Split multiple diagnoses if they exist
+    const diagnoses = diagnosisText.includes(',') ?
+      diagnosisText.split(',').map(d => d.trim()) :
+      [diagnosisText.trim()]
+
+    diagnoses.forEach((diagnosis, index) => {
+      if (diagnosis) {
+        bundle.entry.push({
+          resource: {
+            resourceType: 'Condition',
+            id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`,
+            clinicalStatus: 'active',
+            verificationStatus: 'confirmed',
+            category: [
+              {
+                coding: [
+                  {
+                    system: 'http://hl7.org/fhir/condition-category',
+                    code: 'encounter-diagnosis',
+                    display: 'Encounter Diagnosis'
+                  }
+                ]
+              }
+            ],
+            code: {
+              coding: [
+                {
+                  system: 'http://hl7.org/fhir/sid/icd-10',
+                  code: data.kd_penyakit || 'Z00.0',
+                  display: diagnosis
+                }
+              ],
+              text: diagnosis
+            },
+            subject: {
+              reference: `Patient/${bundle.entry[0].resource.id}`
+            },
+            onsetDateTime: data.tgl_registrasi ? new Date(data.tgl_registrasi).toISOString() : new Date().toISOString()
+          }
+        })
+      }
+    })
+  }
+
+  // Add diagnosis references to Encounter (BPJS exact format)
+  if (data.diagnosa || data.penyakit) {
+    // Find Encounter resource (it should be at index 3: Patient, Organization, Practitioner, Encounter)
+    const encounterResource = (bundle.entry[3] as any)?.resource
+    if (encounterResource && encounterResource.resourceType === 'Encounter') {
+      // Get all Condition resources that were just added
+      const conditionResources = bundle.entry.filter((entry: any) =>
+        entry.resource.resourceType === 'Condition'
+      )
+
+      // Create diagnosis references for each condition
+      encounterResource.diagnosis = conditionResources.map((conditionEntry: any, index: number) => ({
+        condition: {
+          reference: `Condition/${conditionEntry.resource.id}`,
+          role: {
+            coding: [
+              {
+                system: 'http://hl7.org/fhir/diagnosis-role',
+                code: index === 0 ? 'AD' : 'DD',
+                display: index === 0 ? 'Admission diagnosis' : 'Discharge diagnosis'
+              }
+            ]
+          },
+          rank: index + 1
+        }
+      }))
+    }
+  }
+
+  return bundle
+}
+
+// Helper function to parse lab results text
+function parseLabResults(labResultsText: string): any[] {
+  const results: any[] = []
+  const lines = labResultsText.split('\n')
+
+  lines.forEach(line => {
+    line = line.trim()
+    if (!line) return
+
+    // Simple parsing logic - this would need to be enhanced based on actual lab result format
+    const match = line.match(/(.+?)\s*:\s*([\d.,]+)\s*(.*)/)
+    if (match) {
+      results.push({
+        testName: match[1].trim(),
+        value: parseFloat(match[2].replace(',', '.')),
+        unit: match[3] ? match[3].trim() : '',
+        coding: []
+      })
+    }
+  })
+
+  return results
+}
+
+// END OF DISABLED CODE
+*/
+</script>

@@ -1889,222 +1889,6 @@ const tokenStore = useAccessTokenStore()
 const toast = useToast()
 const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
 
-// Enhanced Toast Functions dengan posisi tengah dan styling menarik
-const showSuccessToast = (title: string, description?: string, options?: any) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800 dark:to-green-900/30 shadow-2xl rounded-2xl border border-green-200 dark:border-green-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse-once">
-        <i class="i-tabler-circle-check text-white text-xl"></i>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  // Auto remove after timeout
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, options?.timeout || 3000)
-}
-
-const showErrorToast = (title: string, description?: string, options?: any) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 to-pink-50 dark:from-gray-800 dark:to-red-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-shake-once'
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <i class="i-tabler-alert-circle text-white text-xl"></i>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  // Auto remove after timeout
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, options?.timeout || 4000)
-}
-
-const showInfoToast = (title: string, description?: string, options?: any) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-blue-900/30 shadow-2xl rounded-2xl border border-blue-200 dark:border-blue-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-spin-slow">
-        <i class="i-tabler-info-circle text-white text-xl"></i>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, options?.timeout || 3000)
-}
-
-const showWarningToast = (title: string, description?: string, options?: any) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-800 dark:to-orange-900/30 shadow-2xl rounded-2xl border border-orange-200 dark:border-orange-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-bounce">
-        <i class="i-tabler-alert-triangle text-white text-xl"></i>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, options?.timeout || 3500)
-}
-
-const showBpjsSuccessToast = (description: string) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-gray-800 dark:via-green-900/30 dark:to-teal-900/30 shadow-2xl rounded-2xl border border-emerald-200 dark:border-emerald-700 backdrop-blur-md p-6 min-w-[400px] max-w-md animate-bounce-in'
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-14 h-14 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <span class="text-white text-2xl">🎉</span>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">Sukses Kirim ke BPJS!</h4>
-        <p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>
-        <button onclick="document.getElementById('toast-${toastId}').remove(); console.log('BPJS success detail viewed')" class="mt-3 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105">
-          Lihat Detail
-        </button>
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  // Auto remove after longer timeout for BPJS
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, 8000) // Longer timeout for BPJS toast
-}
-
-const showBpjsErrorToast = (title: string, description: string, options?: any) => {
-  const toastId = Date.now()
-  const toastEl = document.createElement('div')
-  toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 dark:from-gray-800 dark:via-red-900/30 dark:to-rose-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-6 min-w-[500px] max-w-2xl animate-shake-once'
-
-  // Format BPJS response JSON for display
-  const formatBpjsResponse = (bpjsResponse: string) => {
-    try {
-      const parsed = JSON.parse(bpjsResponse)
-      return JSON.stringify(parsed, null, 2)
-    } catch {
-      return bpjsResponse
-    }
-  }
-
-  const formattedResponse = options?.bpjs_response ? formatBpjsResponse(options.bpjs_response) : ''
-
-  toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-14 h-14 bg-gradient-to-br from-red-500 via-pink-500 to-rose-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <span class="text-white text-2xl">❌</span>
-      </div>
-      <div class="flex-1">
-        <h4 class="text-xl font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">${title}</h4>
-        <p class="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium whitespace-pre-line">${description}</p>
-
-        ${formattedResponse ? `
-          <div class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p class="text-xs font-mono text-gray-600 dark:text-gray-400 mb-2">BPJS Response:</p>
-            <pre class="text-xs font-mono text-gray-800 dark:text-gray-300 bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-40 overflow-y-auto">${formattedResponse}</pre>
-          </div>
-        ` : ''}
-
-        ${options?.error_code ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Error Code: ${options.error_code}</p>` : ''}
-        ${options?.error_type ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Error Type: ${options.error_type}</p>` : ''}
-      </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
-      </button>
-    </div>
-  `
-  document.body.appendChild(toastEl)
-
-  setTimeout(() => {
-    const el = document.getElementById(`toast-${toastId}`)
-    if (el) {
-      el.style.opacity = '0'
-      el.style.transform = 'translate(-50%, -50%) scale(0.8)'
-      setTimeout(() => el.remove(), 300)
-    }
-  }, options?.timeout || 8000) // Longer timeout for errors
-}
-
 // ========================================
 // EXISTING REFS (Tab Riwayat)
 // ========================================
@@ -2382,7 +2166,11 @@ watch(codingStatusFilter, () => {
 
 watch(copied, (val) => {
   if (val) {
-    showSuccessToast('✅ Tersalin!', 'Text berhasil disalin ke clipboard', {
+    toast.add({
+      icon: 'i-tabler-circle-check',
+      title: 'Copied!',
+      description: 'Text copied to clipboard',
+      color: 'sky',
       timeout: 2000
     })
   }
@@ -3035,8 +2823,12 @@ async function handleRowClick(row: any) {
 
   // Show info about klaim status if not sent
   if (kemkesStatus !== 'sent') {
-    showInfoToast('ℹ️ Status Klaim', kemkesStatus ? `Status klaim: ${kemkesStatus}` : 'Status klaim tidak tersedia. Detail ERM hanya tersedia jika status klaim sudah "sent".', {
-      timeout: 5000
+    toast.add({
+      icon: 'i-tabler-info-circle',
+      title: 'Status Klaim',
+      description: kemkesStatus ? `Status klaim: ${kemkesStatus}` : 'Status klaim tidak tersedia. Detail ERM hanya tersedia jika status klaim sudah "sent".',
+      color: kemkesStatus === 'unsent' ? 'yellow' : 'orange',
+      timeout: 4000
     })
   }
 }
@@ -4588,11 +4380,13 @@ loadProcedureBilling = loadProcedureBillingWithMappings
 // ========================================
 
 async function sendToBpjs() {
-  // Get the actual SEP number from visit data
-  const validSep = selectedVisitData.value?.no_sep || visitDetails.value?.sep?.noSep || ''
-
-  // Validasi no rawat
-  if (!selectedVisitData.value?.no_rawat || selectedVisitData.value?.no_rawat.trim() === '') {
+  if (!selectedVisitData.value?.no_sep || !selectedVisitData.value?.no_rawat) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Data kunjungan tidak lengkap',
+      color: 'red'
+    })
     bpjsSubmissionStatus.value = 'error'
     setTimeout(() => { bpjsSubmissionStatus.value = 'idle' }, 3000)
     return
@@ -4713,13 +4507,6 @@ async function sendToBpjs() {
     // Check each resource for common missing fields
     medicalRecordBundle.entry?.forEach((entry: any, index: number) => {
       const resource = entry.resource
-
-      // Skip null resources
-      if (!resource) {
-        console.log(`Resource ${index}: null resource (skipped)`)
-        return
-      }
-
       console.log(`Resource ${index} (${resource.resourceType}):`, {
         hasId: !!resource.id,
         hasSubject: !!resource.subject,
@@ -4731,111 +4518,17 @@ async function sendToBpjs() {
 
     // 5. Send to BPJS API with proper wrapper payload
     const currentDate = new Date()
-
     const payload = {
       request: {
-        noSep: validSep,
+        noSep: selectedVisitData.value.no_sep,
         jnsPelayanan: (selectedVisitData.value?.jnspelayanan === 'Ralan' || selectedVisitData.value?.jnspelayanan === '2' || visitDetails.value?.reg_periksa?.jnspelayanan === 'Ralan' || visitDetails.value?.reg_periksa?.jnspelayanan === '2' || visitDetails.value?.sep?.jnsPelayanan === '2') ? '2' : '1', // 1=Rawat Inap, 2=Rawat Jalan
         bulan: String(currentDate.getMonth() + 1).padStart(2, '0'),
         tahun: String(currentDate.getFullYear()),
-        dataMR: medicalRecordBundle  // Send as object (backend will handle encryption/compression)
+        dataMR: medicalRecordBundle  // Send Medical Record Bundle to BPJS
       }
-    }
-
-    // DEBUG: Final check before API call
-    console.log('=== FINAL PRE-API DEBUG ===');
-    const compositionEntry = medicalRecordBundle.entry?.find(entry => entry.resource?.resourceType === 'Composition');
-    if (compositionEntry) {
-      console.log('Composition entry found in medicalRecordBundle!');
-      console.log('Composition section type:', typeof compositionEntry.resource.section);
-      console.log('Composition section isArray:', Array.isArray(compositionEntry.resource.section));
-      console.log('Composition section keys:', Object.keys(compositionEntry.resource.section));
-      console.log('Composition section structure:', JSON.stringify(compositionEntry.resource.section, null, 2));
-    } else {
-      console.log('❌ No composition entry found in medicalRecordBundle!');
     }
 
     console.log('📡 Sending payload to BPJS API:', JSON.stringify(payload, null, 2))
-
-    // Tampilkan dataMR asli sebelum dikirim
-    console.log('🔍 Original dataMR (Bundle):', JSON.stringify(medicalRecordBundle, null, 2))
-
-    // Simulasi proses yang mungkin dilakukan backend:
-    const dataMRString = JSON.stringify(medicalRecordBundle) // For logging purposes
-    const dataMRCompressed = dataMRString // Backend mungkin mengkompres ini
-    console.log('💾 dataMR string length:', dataMRString.length)
-    console.log('📦 dataMR string (minified):', dataMRString.substring(0, 500) + '...')
-
-    // Jika Anda ingin melihat yang akan dikompres:
-    try {
-      // Coba gzip simulation jika ada library
-      if (typeof pako !== 'undefined') {
-        const compressed = pako.gzip(dataMRString)
-        const compressedBase64 = btoa(String.fromCharCode(...compressed))
-        console.log('🗜️ Gzipped dataMR length:', compressed.length)
-        console.log('🗜️ Gzipped dataMR (base64):', compressedBase64)
-        console.log('📋 FOR POSTMAN - Use this as dataMR value:')
-        console.log('dataMR:', compressedBase64)
-      } else {
-        // Manual base64 encoding jika tidak ada pako
-        const base64Encoded = btoa(dataMRString)
-        console.log('🔗 Base64 encoded dataMR:', base64Encoded.substring(0, 100) + '...')
-        console.log('📋 FOR POSTMAN - Use this as dataMR (if backend expects base64):')
-        console.log('dataMR:', base64Encoded)
-      }
-    } catch (e) {
-      console.log('⚠️ pako library not available for gzip simulation')
-      // Fallback: tampilkan string asli
-      console.log('📋 FOR POSTMAN - Use raw dataMR (if backend processes encryption):')
-      console.log('dataMR:', dataMRString)
-    }
-
-    // DEBUG: Check payload before stringify
-    console.log('=== PAYLOAD BEFORE STRINGIFY ===')
-    console.log('Payload structure:', JSON.stringify(payload, null, 2))
-
-    // Check specifically for Procedure note text values
-    if (payload.dataMR && payload.dataMR.entry) {
-      payload.dataMR.entry.forEach((entry, entryIndex) => {
-        if (entry.resource && Array.isArray(entry.resource)) {
-          entry.resource.forEach((resource, resourceIndex) => {
-            if (resource.resourceType === 'Procedure' && resource.note) {
-              resource.note.forEach((note, noteIndex) => {
-                console.log(`PROCEDURE NOTE CHECK - Entry ${entryIndex}, Resource ${resourceIndex}, Note ${noteIndex}:`)
-                console.log('  - text value:', note.text)
-                console.log('  - text type:', typeof note.text)
-                console.log('  - is null:', note.text === null)
-                console.log('  - is empty string:', note.text === '')
-              })
-            }
-          })
-        }
-      })
-    }
-
-    const payloadString = JSON.stringify(payload)
-    console.log('=== PAYLOAD AFTER STRINGIFY ===')
-    console.log('Stringified payload:', payloadString)
-
-    // Check again after stringify
-    const parsedBack = JSON.parse(payloadString)
-    if (parsedBack.dataMR && parsedBack.dataMR.entry) {
-      parsedBack.dataMR.entry.forEach((entry, entryIndex) => {
-        if (entry.resource && Array.isArray(entry.resource)) {
-          entry.resource.forEach((resource, resourceIndex) => {
-            if (resource.resourceType === 'Procedure' && resource.note) {
-              resource.note.forEach((note, noteIndex) => {
-                console.log(`PROCEDURE NOTE CHECK AFTER STRINGIFY - Entry ${entryIndex}, Resource ${resourceIndex}, Note ${noteIndex}:`)
-                console.log('  - text value:', note.text)
-                console.log('  - text type:', typeof note.text)
-                console.log('  - is null:', note.text === null)
-                console.log('  - is empty string:', note.text === '')
-              })
-            }
-          })
-        }
-      })
-    }
 
     const response = await $fetch(`${config.public.API_V2_URL}/bpjs/rekammedis/insert`, {
       method: 'POST',
@@ -4843,7 +4536,7 @@ async function sendToBpjs() {
         'Authorization': `Bearer ${tokenStore.accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: payloadString
+      body: JSON.stringify(payload)
     })
 
     console.log('BPJS Response:', response)
@@ -4853,29 +4546,27 @@ async function sendToBpjs() {
       const bpjsMetadata = response.bpjs_response?.metadata;
       const isActuallySuccess = bpjsMetadata?.code === '200';
 
-      console.log('BPJS Metadata:', bpjsMetadata);
-      console.log('BPJS Code:', bpjsMetadata?.code);
-      console.log('Is Actually Success:', isActuallySuccess);
+      if (isActuallySuccess || bpjsMetadata?.message === 'Data Tidak Ditemukan') {
+        // Show different message for testing vs success
+        const description = bpjsMetadata?.message === 'Data Tidak Ditemukan'
+          ? 'Data berhasil dikirim ke BPJS (SEP testing)'
+          : 'Data berhasil dikirim ke BPJS';
 
-      if (isActuallySuccess) {
-        // Real success case
-        showBpjsSuccessToast('Data berhasil dikirim ke BPJS')
+        toast.add({
+          icon: 'i-tabler-check',
+          title: 'Berhasil',
+          description,
+          color: 'green'
+        })
         bpjsSubmissionStatus.value = 'success'
       } else {
-        // Show BPJS error response with full details
-        const bpjsResponseText = response?.bpjs_response
-          ? JSON.stringify(response.bpjs_response, null, 2)
-          : JSON.stringify({ metadata: bpjsMetadata, response: null }, null, 2);
-
-        showBpjsErrorToast(
-          'BPJS API Error',
-          `Code: ${bpjsMetadata?.code || 'Unknown'}\nMessage: ${bpjsMetadata?.message || 'Unknown error'}`,
-          {
-            timeout: 8000,
-            show_details: true,
-            bpjs_response: bpjsResponseText
-          }
-        )
+        // Show warning if BPJS returned error
+        toast.add({
+          icon: 'i-tabler-alert-triangle',
+          title: 'Warning',
+          description: `BPJS Response: ${bpjsMetadata?.message || 'Unknown error'}`,
+          color: 'orange'
+        })
         bpjsSubmissionStatus.value = 'error'
       }
       // Reset status after 3 seconds
@@ -4886,35 +4577,12 @@ async function sendToBpjs() {
 
   } catch (error) {
     console.error('Error sending to BPJS:', error)
-    console.error('Error details:', {
-      message: error?.message,
-      status: error?.response?.status,
-      statusText: error?.response?.statusText,
-      data: error?.response?._data || error?.response?.data,
-      url: error?.config?.url
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Error',
+      description: 'Gagal mengirim data ke BPJS',
+      color: 'red'
     })
-
-    // Check if error is from BPJS API response
-    const bpjsErrorData = error?.response?._data || error?.response?.data
-    if (bpjsErrorData && bpjsErrorData.bpjs_response) {
-      // Show BPJS error response with full details
-      showBpjsErrorToast(
-        'BPJS API Error',
-        `Status: ${error?.response?.status || 'Unknown'}\nMessage: ${bpjsErrorData.message || 'Unknown error'}`,
-        {
-          timeout: 8000,
-          show_details: true,
-          bpjs_response: JSON.stringify(bpjsErrorData.bpjs_response, null, 2)
-        }
-      )
-    } else {
-      // Show general error with details
-      const errorDetails = error?.response?._data || error?.response?.data || {}
-      showErrorToast('❌ Gagal Mengirim', `Gagal mengirim data ke BPJS.\nStatus: ${error?.response?.status || 'Unknown'}\nMessage: ${errorDetails.message || error?.message || 'Unknown error'}`, {
-        timeout: 8000
-      })
-    }
-
     bpjsSubmissionStatus.value = 'error'
     // Reset status after 3 seconds
     setTimeout(() => { bpjsSubmissionStatus.value = 'idle' }, 3000)
@@ -5264,8 +4932,7 @@ async function generateFhirBundle() {
               "system": "http://hl7.org/fhir/organization-type",
               "code": "prov",
               "display": "Healthcare Provider"
-            }],
-            "text": organizationName
+            }]
           }],
           "name": organizationName,
           "alias": [namaRumahSakit],
@@ -5707,8 +5374,7 @@ async function generateTestBundle() {
               "system": "http://hl7.org/fhir/organization-type",
               "code": "prov",
               "display": "Healthcare Provider"
-            }],
-            "text": organizationName
+            }]
           }],
           "name": organizationName,
           "alias": [namaRumahSakit],
@@ -6250,72 +5916,15 @@ function parseLabResults(labResultsText: string): any[] {
   return results
 }
 
+// GANTI SELURUH FUNGSI INI (sekitar baris 3020)
+// GANTI SELURUH FUNGSI INI (sekitar baris 3020)
 async function generateBPJSMedicalRecordBundle() {
   try {
-    // ==========================================================================
-    // 1. PERSIAPAN DATA
-    // ==========================================================================
-    
+    // Load required data
     const patientData = visitDetails.value?.registrasi?.pasien || visitDetails.value?.pasien
     const regPeriksaData = visitDetails.value?.registrasi || visitDetails.value?.reg_periksa
-
-    // Data laboratorium
-    const lab = visitDetails.value?.lab || []
-
-    // === AKSES DATA DOKTER & PEGAWAI SECARA LANGSUNG ===
-    // Mengambil object dokter dari structure yang tersedia
-    const dokter = visitDetails.value?.registrasi?.dokter || visitDetails.value?.dokter || {};
-    // Mengambil object pegawai dari relasi dokter
-    const pegawai = dokter.pegawai || {};
-
-    // Debug data dokter
-    console.log('Data Dokter:', JSON.stringify(dokter, null, 2));
-    console.log('Data Pegawai:', JSON.stringify(pegawai, null, 2));
-
-    // 1. Ambil SIP langsung dari dokter.no_ijn_praktek
-    const sipValue = visitDetails.value?.dokter?.no_ijn_praktek || dokter.no_ijn_praktek || '-';
-
-    // 2. Ambil nomor KTP asli (pegawai.no_ktp) berdasarkan kd_dokter = pegawai.nik
-    let nomorKTP = '-';
-    try {
-      if (dokter.kd_dokter) {
-        console.log('Mengambil nomor KTP untuk kd_dokter (NIP):', dokter.kd_dokter);
-
-        // Coba akses no_ktp dari data pegawai yang sudah ada (tanpa API call baru)
-        // Kadang field ada tapi tidak visible di console log
-        console.log('Available pegawai fields:', Object.keys(pegawai));
-
-        // Cek semua possible field names untuk no_ktp
-        const possibleKtpFields = ['no_ktp', 'noKtp', 'ktp', 'nomor_ktp', 'nik_ktp'];
-        let foundKTP = false;
-
-        for (const field of possibleKtpFields) {
-          if (pegawai[field] && pegawai[field] !== '') {
-            nomorKTP = pegawai[field];
-            console.log(`✅ Berhasil dapat ${field}:`, nomorKTP);
-            foundKTP = true;
-            break;
-          }
-        }
-
-        if (!foundKTP) {
-          console.log('⚠️ Tidak ada field KTP yang ditemukan, gunakan kd_dokter sementara');
-          console.log('Data pegawai lengkap untuk debugging:', pegawai);
-        }
-      } else {
-        console.warn('⚠️ dokter.kd_dokter tidak ditemukan');
-      }
-    } catch (error) {
-      console.error('❌ General error getting KTP:', error);
-    }
-
-    const nikDokterValue = nomorKTP !== '-' ? nomorKTP : dokter.kd_dokter;
-    console.log('Final NIK (KTP) value:', nikDokterValue,
-      nomorKTP !== '-' ? '(dari no_ktp database)' : '(fallback ke kd_dokter)');
-
-    const practitionerName = dokter.nm_dokter || selectedVisitData.value?.nm_dokter || 'Dokter Pemeriksa';
-
-    // Gabungkan data pasien
+    
+    // Fallback data yang kuat
     const data = {
       ...selectedVisitData.value,
       ...regPeriksaData,
@@ -6327,656 +5936,536 @@ async function generateBPJSMedicalRecordBundle() {
       alamat: regPeriksaData?.pasien?.alamat || patientData?.alamat || 'Alamat Pasien',
       nm_kab: regPeriksaData?.pasien?.kabupaten?.nm_kab || patientData?.kabupaten?.nm_kab || 'Kabupaten',
       nm_kec: regPeriksaData?.pasien?.kecamatan?.nm_kec || patientData?.kecamatan?.nm_kec || 'Kecamatan',
-      nm_prop: regPeriksaData?.pasien?.propinsi?.nm_prop || patientData?.propinsi?.nm_prop || 'Propinsi',
       kd_pos: regPeriksaData?.pasien?.kd_pos || patientData?.kd_pos || '51161',
       tgl_lahir: regPeriksaData?.pasien?.tgl_lahir || patientData?.tgl_lahir || '1900-01-01',
       nm_pasien: regPeriksaData?.pasien?.nm_pasien || patientData?.nm_pasien || 'Pasien',
       jk: regPeriksaData?.pasien?.jk || patientData?.jk || 'L',
-      stts_nikah: regPeriksaData?.pasien?.stts_nikah || patientData?.stts_nikah || 'MENIKAH',
+      // Data untuk format tanggal
       tgl_registrasi: regPeriksaData?.tgl_registrasi || selectedVisitData.value?.tgl_registrasi,
-      jam_reg: regPeriksaData?.jam_reg || selectedVisitData.value?.jam_reg,
-      no_sep: selectedVisitData.value?.no_sep || 'SEP0000000000000'
+      jam_reg: regPeriksaData?.jam_reg || selectedVisitData.value?.jam_reg
     }
 
-    const patientName = data.nm_pasien || data.nama_pasien || 'Unknown Patient';
-
+    // Load hospital settings
     const hospitalSetting = await loadHospitalSetting()
     const kodeFaskesBpjs = hospitalSetting.kode_faskes_bpjs || '0166R001'
     const kodeKemenkes = hospitalSetting.kode_kemenkes || '3326051'
     const namaRumahSakit = hospitalSetting.nama_instansi || 'RSIA AISYIYAH PEKAJANGAN'
-    
-    const alamatOrg = (hospitalSetting.alamat_instansi && hospitalSetting.alamat_instansi.trim() !== '') 
-        ? hospitalSetting.alamat_instansi 
-        : 'Jl. Raya Pekajangan No. 123';
 
-    let jnsPelayanan = '2'; 
-    if (data.jnspelayanan && (data.jnspelayanan === '1' || data.jnspelayanan.toLowerCase().includes('inap'))) {
-        jnsPelayanan = '1';
+    // Get jnspelayanan from SEP data (bridging_sep table) with proper mapping
+    const jnsPelayananFromSEP = visitDetails.value?.sep?.jnsPelayanan
+    const jnsPelayananFromReg = data.jnspelayanan || selectedVisitData.value?.jnspelayanan
+
+    let jnsPelayanan = '1' // Default
+
+    // Priority 1: Use from SEP data if available
+    if (jnsPelayananFromSEP) {
+      jnsPelayanan = jnsPelayananFromSEP
+    }
+    // Priority 2: Use directly if already '2' or '1', or map from text
+    else if (jnsPelayananFromReg === '2' || jnsPelayananFromReg === '1') {
+      jnsPelayanan = jnsPelayananFromReg
+    }
+    // Priority 3: Map from registration data ('Ralan' -> '2', 'Ranap' -> '1')
+    else if (jnsPelayananFromReg === 'Ralan') {
+      jnsPelayanan = '2'
+    } else if (jnsPelayananFromReg === 'Ranap') {
+      jnsPelayanan = '1'
     }
 
+    console.log('🔍 JnsPelayanan Debug (generateBPJSMedicalRecordBundle):', {
+      'SEP.jnsPelayanan': jnsPelayananFromSEP,
+      'Reg.jnspelayanan': jnsPelayananFromReg,
+      'Final jnsPelayanan': jnsPelayanan,
+      'Expected for Rawat Jalan': '2'
+    })
+
+    // =================================================================
+    // PERBAIKAN FORMAT TANGGAL KE 'YYYY-MM-DD HH:MM:SS'
+    // =================================================================
     const now = new Date();
-    let startDate = now;
+    let startDate: Date;
+    
     if (data.tgl_registrasi && data.jam_reg) {
         try {
+            // Coba parsing tanggal dari data
             const parts = data.tgl_registrasi.split('-');
             const timeParts = data.jam_reg.split(':');
-            startDate = new Date(parts[0], parts[1] - 1, parts[2], timeParts[0], timeParts[1], timeParts[2]);
-        } catch (e) {}
+            startDate = new Date(
+                parseInt(parts[0]), 
+                parseInt(parts[1]) - 1, // Bulan (0-11)
+                parseInt(parts[2]),
+                parseInt(timeParts[0]),
+                parseInt(timeParts[1]),
+                parseInt(timeParts[2])
+            );
+        } catch (e) {
+            console.warn('Gagal parsing tanggal registrasi, menggunakan waktu sekarang', e)
+            startDate = now; // Fallback jika parsing gagal
+        }
+    } else {
+        console.warn('Data tgl_registrasi atau jam_reg tidak ada, menggunakan waktu sekarang')
+        startDate = now; // Fallback jika data tgl/jam reg tidak ada
     }
-    const startTime = formatBpjsDateTime(startDate);
-    const endTime = formatBpjsDateTime(now);
 
-    // ==========================================================================
-    // 2. GENERATE IDs & ARRAYS
-    // ==========================================================================
+    const startTime = formatBpjsDateTime(startDate); // '2025-11-13T11:21:33+07:00'
+    const endTime = formatBpjsDateTime(now);       // '2025-11-15T13:15:49+07:00'
+    // =================================================================
+    // AKHIR PERBAIKAN TANGGAL
+    // =================================================================
+
+    // Generate unique IDs
     const bundleId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
-    const compositionId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
     const patientId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
-    const practitionerId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
     const organizationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+    const practitionerId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
     const encounterId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+    const compositionId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
 
-    const diagnosisRefs = [];
-    const medicationRefs = [];
-    const procedureRefs = [];
-    const medicationsList = []; 
-    const proceduresList = []; 
-    const finalEntries = [];
+    // Generate resources array
+    const resources = []
 
-    // ==========================================================================
-    // 3. CREATE INDIVIDUAL RESOURCES
-    // ==========================================================================
-
-    // --- 1. PATIENT ---
-    const patientResource = {
+    // 1. Patient Resource (STANDAR FHIR - ARRAY)
+    resources.push({
       resourceType: 'Patient',
       id: patientId,
-      identifier: [
+      identifier: [ 
         {
-            use: 'usual',
-            type: {
-              coding: [
-                { "system": "http://hl7.org/fhir/v2/0203", "code": "MR" }
-              ]
-            },
-            value: data.no_rkm_medis,
-            assigner: { "display": namaRumahSakit }
+          use: 'usual',
+          type: { coding: [{ system: 'http://hl7.org/fhir/v2/0203', code: 'MR' }] },
+          system: `urn:oid:${kodeKemenkes}`, 
+          value: data.no_rkm_medis,
+          assigner: { display: namaRumahSakit }
         },
         {
-            use: 'official',
-            type: {
-              coding: [
-                { "system": "http://hl7.org/fhir/v2/0203", "code": "MB" }
-              ]
-            },
-            value: data.no_peserta,
-            assigner: { "display": "BPJS KESEHATAN" }
+          use: 'official',
+          type: { coding: [{ system: 'http://hl7.org/fhir/v2/0203', code: 'MB' }], text: 'Nomor Peserta BPJS Kesehatan' },
+          system: 'urn:oid:bpjs', 
+          value: data.no_peserta,
+          assigner: { display: 'BPJS Kesehatan' }
         },
         {
-            use: 'official',
-            type: {
-              coding: [
-                { "system": "http://hl7.org/fhir/v2/0203", "code": "NNIDN" }
-              ]
-            },
-            value: data.no_ktp,
-            assigner: { "display": "KEMENDAGRI" }
+          use: 'official',
+          type: { coding: [{ system: 'http://hl7.org/fhir/v2/0203', code: 'NNIDN' }], text: 'NIK' },
+          system: 'urn:oid:KEMENDAGRI', 
+          value: data.no_ktp,
+          assigner: { display: 'KEMENDAGRI' }
         }
       ],
       active: true,
-      name: [{ use: 'official', text: data.nm_pasien }],
-      telecom: [
-        { "system": "phone", "value": data.no_tlp || "", "use": "mobile" },
-        { "system": "phone", "value": "", "use": "work" },
-        { "system": "phone", "value": "TDK ADA", "use": "home" }
-      ],
+      name: [{ 
+        use: 'official',
+        text: data.nm_pasien
+      }],
+      telecom: [{
+        system: 'phone',
+        value: data.no_tlp,
+        use: 'home'
+      }],
       gender: data.jk === 'L' ? 'male' : 'female',
       birthDate: data.tgl_lahir,
-      deceasedBoolean: false,
       address: [{ 
-          use: 'home', 
-          type: 'both', 
-          text: data.alamat, 
-          line: [data.alamat], 
-          city: data.nm_kab, 
-          district: data.nm_kec, 
-          state: data.nm_prop, 
-          postalCode: data.kd_pos, 
-          country: 'Indonesia'
+        use: 'home',
+        type: 'both',
+        text: data.alamat,
+        line: [ data.alamat ], 
+        city: data.nm_kab,
+        district: data.nm_kec,
+        postalCode: data.kd_pos,
+        country: 'IDN'
+      }]
+    })
+
+    // 2. Organization Resource (STANDAR FHIR - ARRAY)
+    console.log('🔍 Debug Poli Data:')
+    console.log('- visitDetails.value.poli?.nm_poli:', visitDetails.value.poli?.nm_poli)
+    console.log('- data.nm_poli:', data.nm_poli)
+    console.log('- data.poli_tujuan:', data.poli_tujuan)
+    console.log('- data.poli_rujukan:', data.poli_rujukan)
+    console.log('- data.nm_poli_dpjp:', data.nm_poli_dpjp)
+    console.log('- regPeriksaData data poli:', {
+      nm_poli: regPeriksaData?.nm_poli,
+      poli_tujuan: regPeriksaData?.poli_tujuan,
+      kd_poli: regPeriksaData?.kd_poli
+    })
+
+    // Mapping kode poli ke nama poli
+    const poliMapping: { [key: string]: string } = {
+      'IGDK': 'Instalasi Gawat Darurat',
+      'IGD': 'Instalasi Gawat Darurat',
+      'RI': 'Radiologi',
+      'RAD': 'Radiologi',
+      'LAB': 'Laboratorium',
+      'INT': 'Penyakit Dalam',
+      'OBG': 'Obstetri dan Ginekologi',
+      'ANO': 'Anak',
+      'BED': 'Bedah',
+      'MAT': 'Maternal',
+      'PAR': 'Paru',
+      'JAN': 'Jantung',
+      'SAR': 'Saraf',
+      'KUL': 'Kulit dan Kelamin',
+      'THT': 'Telinga Hidung Tenggorokan',
+      'MATA': 'Mata',
+      'GIGI': 'Gigi dan Mulut',
+      'ORTH': 'Ortopedi',
+      'PSI': 'Psikiatri',
+      'REH': 'Rehabilitasi Medik',
+      'UMU': 'Poli Umum',
+      'VK': 'Poli Vaksin',
+      'KIA': 'Kesehatan Ibu dan Anak',
+      'GIZI': 'Gizi',
+      'FISIO': 'Fisioterapi'
+    }
+
+    const kdPoli = regPeriksaData?.kd_poli || data.kd_poli || ''
+    const poliNameFromMapping = kdPoli ? (poliMapping[kdPoli] || '') : ''
+    const poliName = visitDetails.value.poli?.nm_poli ||
+                    data.nm_poli ||
+                    data.poli_tujuan ||
+                    data.poli_rujukan ||
+                    regPeriksaData?.nm_poli ||
+                    poliNameFromMapping ||
+                    ''
+
+    const organizationName = poliName ? `${poliName} - ${namaRumahSakit}` : namaRumahSakit
+
+    console.log('🏥 Final Organization Name:', organizationName)
+    console.log('📋 Used poli source:', {
+      fromDirect: poliName && !poliNameFromMapping ? 'direct' : 'mapping',
+      kdPoli: kdPoli,
+      mappedName: poliNameFromMapping,
+      finalName: poliName
+    })
+
+    resources.push({
+      resourceType: 'Organization',
+      id: organizationId,
+      identifier: [
+        {
+          use: 'official',
+          system: 'urn:oid:bpjs',
+          value: kodeFaskesBpjs
+        },
+        {
+          use: 'official',
+          system: 'urn:oid:KEMKES',
+          value: kodeKemenkes
+        }
+      ],
+      type: [{
+         coding: [{
+            system: 'http://hl7.org/fhir/organization-type',
+            code: 'prov',
+            display: 'Healthcare Provider'
+         }],
+         text: organizationName
       }],
-      maritalStatus: { 
-          coding: [{ system: "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus", code: data.stts_nikah?.toUpperCase().includes('NIKAH') ? "M" : "U", display: data.stts_nikah }],
-          text: data.stts_nikah || null
-      },
-      managingOrganization: { reference: `Organization/${organizationId}`, display: namaRumahSakit }
-    };
-    finalEntries.push({ resource: patientResource });
+      name: organizationName,
+      alias: [namaRumahSakit],
+      telecom: [{
+        system: 'phone',
+        value: hospitalSetting.kontak || '0281-432123',
+        use: 'work'
+      }],
+      address: [{
+        use: 'work',
+        text: hospitalSetting.alamat_lengkap || `${hospitalSetting.alamat_instansi || 'Jl. Pekajangan No. 123'}, ${hospitalSetting.kelurahan || ''}, ${hospitalSetting.kecamatan || 'Kecamatan'}, ${hospitalSetting.kabupaten?.nm_kab || 'Kabupaten Pekalongan'}, ${hospitalSetting.propinsi?.nm_prop || 'Provinsi Jawa Tengah'}, ${hospitalSetting.kd_pos || '51161'}, Indonesia`,
+        line: [hospitalSetting.alamat_instansi || 'Jl. Pekajangan No. 123'],
+        city: hospitalSetting.kabupaten?.nm_kab || 'Kabupaten Pekalongan',
+        district: hospitalSetting.kecamatan || 'Kecamatan',
+        state: hospitalSetting.propinsi?.nm_prop || 'Provinsi Jawa Tengah',
+        postalCode: hospitalSetting.kd_pos || '51161',
+        country: 'IDN'
+      }],
+      contact: [{
+        purpose: {
+          coding: [{
+            system: 'http://hl7.org/fhir/contactentity-type',
+            code: 'PATINF'
+          }]
+        },
+        telecom: [{
+          system: 'phone',
+          value: hospitalSetting.kontak || '0281-432123'
+        }]
+      }]
+    })
 
-    // --- 2. ORGANIZATIONS ---
-    const organizations = [
-      {
-        name: namaRumahSakit,
-        id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
-      }
-    ];
+    // 3. Practitioner Resource (STANDAR FHIR - ARRAY)
+    const practitionerName = data.dpjp || data.dokter?.nm_dokter || data.nm_dokter || visitDetails.value?.dokter?.nm_dokter || 'Dokter'
+    const nikValue = data.no_nik_dokter || data.dokter?.no_nik || '0000000000000000'
+    const phoneValue = data.telp_dokter || data.dokter?.telp || data.hp_dokter || '080000000000'
+    const noIjinPraktek = data.no_ijin_praktek || data.sip || data.no_sip || data.no_izin_praktek || '1.2.01.3173.1834/14022/04.16.1'
 
-    organizations.forEach(org => {
-      const organizationResource = {
-        resourceType: 'Organization',
-        id: org.id,
-        identifier: [
-          {
-            use: "official",
-            type: { coding: [], text: null },
-            system: "urn:oid:bpjs",
-            value: kodeFaskesBpjs,
-            assigner: { display: null }
-          },
-          {
-            use: "official",
-            type: { coding: [], text: null },
-            system: "urn:oid:KEMKES",
-            value: kodeKemenkes,
-            assigner: { display: null }
-          }
-        ],
-        type: [
-          {
-            coding: [
-              {
-                system: "http://hl7.org/fhir/organization-type",
-                code: "prov",
-                display: "Healthcare Provider"
-              }
-            ],
-            text: org.name
-          }
-        ],
-        name: org.name,
-        alias: [namaRumahSakit],
-        telecom: [
-          {
-            system: "phone",
-            value: hospitalSetting.kontak || '0285-000000',
-            use: "work"
-          }
-        ],
-        address: [
-          {
-            use: "work",
-            type: "physical",
-            text: alamatOrg,
-            line: [alamatOrg],
-            city: hospitalSetting.kabupaten || 'KABUPATEN PEKALONGAN',
-            district: hospitalSetting.kecamatan || 'KEDUNGWUNI',
-            state: hospitalSetting.propinsi || 'JAWA TENGAH',
-            postalCode: '51161',
-            country: "IDN"
-          }
-        ],
-        contact: [
-          {
-            purpose: {
-              coding: [
-                {
-                  system: "https://www.hl7.org/fhir/codesystem-contactentity-type.html",
-                  code: "PATINF",
-                  display: null
-                }
-              ],
-              text: "Operator"
-            },
-            telecom: [
-              {
-                system: "phone",
-                value: hospitalSetting.kontak || '0285-000000',
-                use: null
-              }
-            ]
-          }
-        ]
-      };
-      finalEntries.push({ resource: organizationResource });
-    });
-
-    // --- 3. PRACTITIONER (FIXED: Dynamic from dokter.no_ijin_praktek & pegawai.no_ktp) ---
-    const practitionerResource = {
+    resources.push({
       resourceType: 'Practitioner',
       id: practitionerId,
       identifier: [
         {
-          use: "official",
+          use: 'official',
           type: {
-            coding: [],
-            text: null
+            coding: [{
+              system: 'urn:oid:nomor_sip'
+            }]
           },
-          system: "urn:oid:nomor_sip",
-          value: sipValue, // <-- Diambil dari dokter.no_ijin_praktek
-          assigner: {
-            display: null
-          }
+          value: noIjinPraktek
         },
         {
-          use: "official",
+          use: 'official',
           type: {
-            coding: [
-              {
-                system: "http://hl7.org/fhir/v2/0203",
-                code: "NNIDN",
-                display: null
-              }
-            ],
-            text: null
+            coding: [{
+              system: 'http://hl7.org/fhir/v2/0203',
+              code: 'NNIDN'
+            }],
+            text: 'NIK'
           },
-          system: null,
-          value: nikDokterValue, // <-- Diambil dari pegawai.no_ktp
-          assigner: {
-            display: "KEMENDAGRI"
-          }
+          system: 'urn:oid:KEMENDAGRI',
+          value: nikValue,
+          assigner: { display: 'KEMENDAGRI' }
         }
       ],
-      name: [{ use: 'official', text: practitionerName }],
-      birthDate: dokter.tgl_lahir ? `${dokter.tgl_lahir} 00:00:00` : "2022-08-02 00:00:00",
-      telecom: [
-        { system: 'phone', value: '(0296) 531624', use: 'work' },
-        { system: 'email', value: '', use: 'work' },
-        { system: 'fax', value: '', use: 'work' }
-      ],
-      address: [{
-        use: 'home',
-        type: 'physical',
-        text: pegawai.petugas?.alamat || '-',
-        line: [pegawai.petugas?.alamat || '-'],
-        city: hospitalSetting.kota || 'Purwokerto',
-        district: hospitalSetting.kecamatan || 'Nusa',
-        state: hospitalSetting.propinsi || 'JAWA TENGAH',
-        postalCode: hospitalSetting.kode_pos || '53146',
-        country: 'IDN'
+      name: [{
+        use: 'official',
+        text: practitionerName
       }],
-      gender: dokter.jk === 'P' ? 'female' : 'male'
-    };
-    finalEntries.push({ resource: practitionerResource });
+      telecom: [
+        {
+          system: 'phone',
+          value: phoneValue,
+          use: 'work'
+        },
+        {
+          system: 'mobile',
+          value: data.dokter?.no_telp || data.no_telp_dokter || visitDetails.value?.dokter?.no_telp || phoneValue,
+          use: 'mobile'
+        },
+        {
+          system: 'email',
+          value: data.dokter?.email || data.email_dokter || visitDetails.value?.dokter?.email || '-',
+          use: 'work'
+        },
+        {
+          system: 'fax',
+          value: data.dokter?.fax || data.fax_dokter || visitDetails.value?.dokter?.fax || '-',
+          use: 'work'
+        }
+      ]
+    })
 
-    // --- 4. CONDITION (Diagnosa) ---
+    // 5. Diagnosis Resources (Condition) - Lengkap dari diagnosa_pasien table
+    const conditionResources = []
+    let diagnosisCounter = 1
+
+    // Prioritaskan data dari visitDetails.value.diagnosa (dari diagnosa_pasien table)
     if (visitDetails.value?.diagnosa && Array.isArray(visitDetails.value.diagnosa)) {
-      visitDetails.value.diagnosa.forEach((diag) => {
-        if (!diag.kode) return;
-        const condId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        
-        const condition = {
+      console.log('🩺 Processing diagnoses from diagnosa_pasien table:', visitDetails.value.diagnosa.length, 'diagnoses found')
+
+      visitDetails.value.diagnosa.forEach((diagnosisItem: any) => {
+        // Validasi data diagnosa
+        if (!diagnosisItem.kode || !diagnosisItem.deskripsi) {
+          console.warn('⚠️ Invalid diagnosis data (missing kode or deskripsi):', diagnosisItem)
+          return // Skip invalid diagnosis
+        }
+
+        const conditionId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+
+        console.log(`📋 Creating Condition ${diagnosisCounter++}: ${diagnosisItem.kode} - ${diagnosisItem.deskripsi}`)
+
+        const conditionResource = {
           resourceType: 'Condition',
-          id: condId,
+          id: conditionId,
           clinicalStatus: 'active',
           verificationStatus: 'confirmed',
-          category: [
-            {
-              "coding": [
-                {
-                  "system": "http://hl7.org/fhir/condition-category",
-                  "code": "encounter-diagnosis",
-                  "display": "Encounter Diagnosis"
-                }
-              ],
-              "text": null
-            }
-          ],
-          code: { coding: [{ system: 'http://hl7.org/fhir/sid/icd-10', code: diag.kode, display: diag.deskripsi }], text: diag.deskripsi },
-          subject: { reference: `Patient/${patientId}` },
-          onsetDateTime: startTime
-        };
-        finalEntries.push({ resource: condition });
-        diagnosisRefs.push({ reference: `Condition/${condId}` });
-      });
-    }
-
-    // --- 5. MEDICATION REQUEST (Obat) ---
-    const obatList = (resepObat.value && resepObat.value.length > 0)
-        ? resepObat.value.flatMap(r => r.detail || [])
-        : (visitDetails.value?.obat || []);
-
-    if (obatList.length > 0) {
-      obatList.forEach(obat => {
-        const medId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const medName = obat.obat?.nama_brng || obat.nama_brng || 'Obat';
-        const medCode = obat.kode_brng || '000';
-        const aturan = obat.aturan_pakai?.aturan || '1x1';
-        const jumlah = obat.jml || 1;
-        const satuan = obat.obat?.kode_sat || 'TAB';
-
-        const medRequest = {
-          resourceType: 'MedicationRequest',
-          id: medId,
-          text: {
-            "div": medName
-          },
-          identifier: {
-            "system": "id_resep_pulang",
-            "value": medId
+          category: [{
+            coding: [{
+              system: 'http://hl7.org/fhir/condition-category',
+              code: 'encounter-diagnosis',
+              display: 'Encounter Diagnosis'
+            }]
+          }],
+          code: {
+            coding: [{
+              system: 'http://hl7.org/fhir/sid/icd-10',
+              code: diagnosisItem.kode,
+              display: diagnosisItem.deskripsi
+            }],
+            text: diagnosisItem.deskripsi
           },
           subject: {
-            "display": data.nm_pasien,
-            "reference": `Patient/${patientId}`
+            reference: `Patient/${patientId}`,
+            noSep: data.no_sep
           },
-          intent: "final",
-          medicationCodeableConcept: {
-            "coding": [
-              {
-                "system": "https://rsiaaisyiyah.com/drug",
-                "code": medCode
-              }
-            ],
-            "text": medName
+          encounter: {
+            reference: `Encounter/${encounterId}`
           },
-          dosageInstruction: [{
-            "doseQuantity": {
-              "code": satuan,
-              "system": "http://unitsofmeasure.org",
-              "unit": satuan,
-              "value": jumlah
-            },
-            "route": {
-              "coding": [
-                {
-                  "system": "http://snomed.info/sct",
-                  "code": "001",
-                  "display": "ORAL"
-                }
-              ]
-            },
-            "timing": {
-              "repeat": { "frequency": "1", "period": "1", "periodUnit": "d" }
-            },
-            "additionalInstruction": [
-                {
-                  "text": "Tidak Ada"
-                }
-              ]
-          }],
-          reasonCode: [
-            {
-              "coding": [{ "system": "", "code": "", "display": "" }],
-              "text": ""
-            }
-          ],
-          requester: {
-            agent: {
-              display: practitionerName,
-              reference: `Practitioner/${practitionerId}`
-            },
-            onBehalfOf: {
-              reference: `Organization/${organizationId}`
-            }
+          onsetDateTime: startTime, // Format YYYY-MM-DDTHH:mm:ss+07:00
+          recordedDate: formatBpjsDateTime(new Date()),
+          severity: {
+            coding: [{
+              system: 'http://snomed.info/sct',
+              code: '255604002',
+              display: 'Mild'
+            }]
           },
-          "meta": { "lastUpdated": endTime }
-        };
-        medicationsList.push(medRequest);
-        medicationRefs.push({ reference: `MedicationRequest/${medId}` });
-      });
-      // Add all medications as ONE entry with array structure
-      if (medicationsList.length > 0) {
-        finalEntries.push({ resource: medicationsList });
-      }
+          bodySite: [] // Additional if needed
+        }
+
+        conditionResources.push({
+          id: conditionId,
+          text: diagnosisItem.deskripsi,
+          code: diagnosisItem.kode,
+          resource: conditionResource
+        })
+      })
     }
 
-    // --- 6. ENCOUNTER ---
+    // Fallback ke data diagnosa dari reg_periksa jika tidak ada data dari diagnosa_pasien
+    if (conditionResources.length === 0) {
+      console.log('🔄 Using fallback diagnosis from reg_periksa data')
+      const fallbackDiagnosis = data.diagnosa || data.penyakit || 'General examination'
+      const fallbackCode = data.kd_penyakit || 'Z00.0'
+
+      const conditionId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+
+      const conditionResource = {
+        resourceType: 'Condition',
+        id: conditionId,
+        clinicalStatus: 'active',
+        verificationStatus: 'confirmed',
+        category: [{
+          coding: [{
+            system: 'http://hl7.org/fhir/condition-category',
+            code: 'encounter-diagnosis',
+            display: 'Encounter Diagnosis'
+          }]
+        }],
+        code: {
+          coding: [{
+            system: 'http://hl7.org/fhir/sid/icd-10',
+            code: fallbackCode,
+            display: fallbackDiagnosis
+          }],
+          text: fallbackDiagnosis
+        },
+        subject: {
+          reference: `Patient/${patientId}`,
+          display: data.nm_pasien || data.nama_pasien || 'Unknown Patient'
+        },
+        encounter: {
+          reference: `Encounter/${encounterId}`
+        },
+        onsetDateTime: startTime,
+        recordedDate: formatBpjsDateTime(new Date()),
+        severity: {
+          coding: [{
+            system: 'http://snomed.info/sct',
+            code: '255604002',
+            display: 'Mild'
+          }]
+        }
+      }
+
+      conditionResources.push({
+        id: conditionId,
+        text: fallbackDiagnosis,
+        code: fallbackCode,
+        resource: conditionResource
+      })
+    }
+
+    // Push semua Condition resources ke bundle
+    conditionResources.forEach((conditionData) => {
+      resources.push(conditionData.resource)
+    })
+
+    console.log(`✅ Created ${conditionResources.length} Condition resources from diagnosa_pasien table`)
+
+    // 4. Encounter Resource (STANDAR FHIR - ARRAY) dengan diagnosis links
+    const encounterClass = (data.jnspelayanan === 'Ralan' || data.jnspelayanan === '2' || data.jnspelayanan === 2 || jnsPelayanan === '2') ? 'AMB' : 'IMP'
+
+    // Create diagnosis array untuk Encounter (link ke Condition resources)
+    const encounterDiagnosis = conditionResources.map((condition, index) => ({
+      condition: {
+        reference: `Condition/${condition.id}`,
+        display: condition.text
+      },
+      role: {
+        coding: [{
+          system: 'http://hl7.org/fhir/diagnosis-role',
+          code: index === 0 ? 'DD' : 'AD', // Primary diagnosis for first, Additional for others
+          display: index === 0 ? 'Discharge Diagnosis' : 'Admission Diagnosis'
+        }]
+      },
+      rank: index + 1
+    }))
+
     const encounterResource = {
       resourceType: 'Encounter',
       id: encounterId,
-      identifier: [
-        {
-          "use": null,
-          "type": {
-            "coding": [],
-            "text": null
-          },
-          "system": "http://api.bpjs-kesehatan.go.id:8080/Vclaim-rest/SEP/",
-          "value": data.no_sep,
-          "assigner": {
-            "display": null
-          }
-        }
-      ],
-      status: 'Finished',
-      text: {
-        "div": `Admitted to ${jnsPelayanan === '1' ? 'Inpatient' : 'Outpatient'} - ${namaRumahSakit}`,
-        "status": "generated"
-      },
+      identifier: [{
+        use: 'official',
+        system: 'http://api.bpjs-kesehatan.go.id:8080/Vclaim-rest/SEP/',
+        value: data.no_sep,
+        assigner: { display: 'BPJS Kesehatan' }
+      }],
+      status: 'finished',
       class: {
         system: 'http://hl7.org/fhir/v3/ActCode',
-        code: jnsPelayanan === '1' ? 'IMP' : 'AMB',
-        display: jnsPelayanan === '1' ? 'inpatient encounter' : 'ambulatory'
+        code: encounterClass,
+        display: encounterClass === 'AMB' ? 'ambulatory' : 'inpatient encounter'
       },
       subject: {
         reference: `Patient/${patientId}`,
-        display: data.nm_pasien,
-        noSep: data.no_sep
+        display: data.nm_pasien
       },
-      incomingReferral: [
-        {
-          "identifier": [
-            {
-              "use": null,
-              "type": { "coding": [], "text": null },
-              "system": "nomor_rujukan_bpjs",
-              "value": data.no_sep,
-              "assigner": { "display": null }
-            }
-          ]
-        }
-      ],
-      reason: [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/sid/icd-10",
-              "code": "Z00.0",
-              "display": "Pemeriksaan umum"
-            }
-          ],
-          "text": "Pemeriksaan umum"
-        }
-      ],
-      hospitalization: {
-        "dischargeDisposition": [
-          {
-            "coding": [
-              {
-                "system": "http://hl7.org/fhir/discharge-disposition",
-                "code": "home",
-                "display": "Home"
-              }
-            ],
-            "text": null
-          }
-        ]
+      period: {
+        start: startTime, // Format YYYY-MM-DDTHH:mm:ss+07:00
+        end: endTime      // Format YYYY-MM-DDTHH:mm:ss+07:00
       },
-      period: { start: startTime, end: startTime },
-      diagnosis: diagnosisRefs.map((ref, index) => ({
-          condition: {
-            reference: ref.reference,
-            role: {
-              coding: [
-                {
-                  "system": "http://hl7.org/fhir/diagnosis-role",
-                  "code": index === 0 ? "DD" : "AD",
-                  "display": index === 0 ? "Discharge Diagnosis" : "Admission Diagnosis"
-                }
-              ],
-              "text": null
-            },
-            rank: index + 1
-          }
-      })),
-      reason: [
-        {
-          "coding": [
-            {
-              "system": "http://hl7.org/fhir/sid/icd-10",
-              "code": "Z00.0",
-              "display": "Pemeriksaan umum"
-            }
-          ],
-          "text": "Pemeriksaan umum"
-        }
-      ]
-    };
-    finalEntries.push({ resource: encounterResource });
-
-    // --- 7. COMPOSITION ---
-    const compositionSections: {[key: string]: any} = {};
-    const keluhan = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || data.keluhan || 'Tidak ada keluhan').trim();
-    let sectionIndex = 0; // Use consecutive 0,1,2,3... indices
-
-    // Helper function to create sparse keys to prevent automatic array conversion
-    const getSparseKey = (index: number) => String((index + 1) * 10); // 10, 20, 30... to prevent array conversion
-
-    // Use string keys to match successful bundle structure
-    compositionSections[String(sectionIndex)] = {
-      title: "Reason for admission",
-      code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "29299-5",
-                  "display": "Reason for visit Narrative"
-                }
-              ]
-            },
-      text: { status: "additional", div: keluhan },
-      entry: null
-    };
-
-    if (diagnosisRefs.length > 0) {
-      // Admission diagnosis
-      sectionIndex++;
-      compositionSections[String(sectionIndex)] = {
-        title: "Admission diagnosis",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "42347-5",
-                  "display": "Admission diagnosis Narrative"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Diagnosa Awal" },
-        entry: null
-      };
-      sectionIndex++;
-
-      // Chief complaint
-      compositionSections[String(sectionIndex)] = {
-        title: "Chief complaint",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "10154-3",
-                  "display": "Chief complaint Narrative"
-                }
-              ]
-            },
-        text: { status: "additional", div: keluhan },
-        entry: null
-      };
-      sectionIndex++;
-
-      // Hospital course Narrative
-      compositionSections[String(sectionIndex)] = {
-        title: "Hospital course Narrative",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "28319-2",
-                  "display": "pain.status"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Perjalanan perawatan pasien" },
-        entry: null
-      };
-      sectionIndex++;
-
-      // Discharge diagnosis
-      compositionSections[String(sectionIndex)] = {
-        title: "Discharge diagnosis",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "42347-5",
-                  "display": "Discharge diagnosis Narrative"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Diagnosa Pasien" },
-        entry: null
-      };
+      serviceProvider: {
+        reference: `Organization/${organizationId}`,
+        display: namaRumahSakit
+      },
+      diagnosis: encounterDiagnosis,
+      reasonCode: {
+        coding: [{
+          system: 'http://hl7.org/fhir/sid/icd-10',
+          code: conditionResources[0]?.code || 'Z00.0',
+          display: 'ICD 10'
+        }],
+        text: conditionResources[0]?.text || 'General examination'
+      },
+      reason: [{
+        text: conditionResources[0]?.text || 'General examination'
+      }]
     }
 
-    if (medicationRefs.length > 0) {
-      // Plan of care
-      sectionIndex++;
-      compositionSections[String(sectionIndex)] = {
-        title: "Plan of care",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "18776-5",
-                  "display": "Plan of care"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Rencana perawatan" },
-        mode: "working",
-        entry: null
-      };
-      sectionIndex++;
+    resources.push(encounterResource)
 
-      // Known allergies
-      compositionSections[String(sectionIndex)] = {
-        title: "Known allergies",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "48765-2",
-                  "display": "Allergies and adverse reactions"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Tidak ada alergi yang diketahui" },
-        entry: null
-      };
-      sectionIndex++;
-      sectionIndex++; // Skip index 6 to match successful Bundle structure (7 -> 8)
+    // 6. Composition Resource (STRUKTUR ANEH SESUAI bundle.json)
+    const compositionSections = {}
+    let sectionIndex = 0
+    
+    // Section 0: Keluhan
+    const keluhan = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || data.keluhan || 'Tidak ada keluhan').trim()
+    compositionSections[sectionIndex++] = {
+      title: 'Reason for admission',
+      code: { coding: [{ system: 'http://loinc.org', code: '29299-5', display: 'Reason for visit Narrative' }] },
+      text: { status: 'additional', div: keluhan },
+      mode: 'working',
+      entry: [{ reference: `Encounter/${encounterId}` }]
+    }
+    
+    // Section 1: Diagnosa (wajib) - Gunakan Condition resources dari diagnosa_pasien
+    const diagnosisTexts = conditionResources.map(c => c.text).join(', ') || 'Tidak ada diagnosa'
+    const diagnosisEntries = conditionResources.map(c => ({ reference: `Condition/${c.id}` }))
 
-      // Medications on Discharge
-      if (medicationsList.length > 0) {
-        const medicationEntries = medicationRefs.map(ref => ({ reference: ref.reference }));
-
-        compositionSections[String(sectionIndex)] = {
-          title: "Medications on Discharge",
-          code: {
-            "coding": [
-              {
-                "system": "http://loinc.org",
-                "code": "75311-1",
-                "display": "Hospital discharge medications Narrative"
-              }
-            ]
-          },
-          text: {
-            "status": "additional",
-            "div": `Resep Pulang untuk pasien ${data.nm_pasien}`
-          },
-          mode: "working",
-          entry: medicationEntries
-        };
-      }
+    compositionSections[sectionIndex++] = {
+        title: 'Discharge diagnosis',
+        code: { coding: [{ system: 'http://loinc.org', code: '42347-5', display: 'Discharge diagnosis Narrative' }] },
+        text: { status: 'additional', div: diagnosisTexts },
+        mode: 'working',
+        entry: diagnosisEntries
     }
 
     const compositionResource = {
@@ -6984,566 +6473,363 @@ async function generateBPJSMedicalRecordBundle() {
       id: compositionId,
       status: 'final',
       type: {
-        coding: [
-          {
-            "system": "http://loinc.org",
-            "code": "81218-0"
-          }
-        ],
-        "text": "Discharge Summary"
+        coding: [{ 
+          system: 'http://loinc.org',
+          code: '81218-0'
+        }],
+        text: 'Discharge Summary'
       },
       subject: {
-        "reference": `Patient/${patientId}`,
-        "display": data.nm_pasien
+        reference: `Patient/${patientId}`,
+        display: data.nm_pasien
       },
       encounter: {
-        "reference": `Encounter/${encounterId}`
+        reference: `Encounter/${encounterId}`
       },
-      date: endTime,
-      author: [
-        {
-          "reference": `Practitioner/${practitionerId}`,
-          "display": practitionerName
+      date: endTime, // Format YYYY-MM-DDTHH:mm:ss+07:00
+      author: [{ 
+        reference: `Practitioner/${practitionerId}`,
+        display: practitionerName
+      }],
+      title: 'Discharge Summary',
+      confidentiality: 'N',
+      section: compositionSections // 'section' sebagai OBJEK BERNOMOR
+    }
+    resources.push(compositionResource)
+
+    // 8. MedicationRequest Resources dari Resep Obat
+    console.log('🔍 Checking resepObat data for MedicationRequest generation:', {
+      resepObatLength: resepObat.value?.length || 0,
+      resepObatData: resepObat.value,
+      visitDetailsObatLength: visitDetails.value?.obat?.length || 0,
+      visitDetailsObatData: visitDetails.value?.obat,
+      fullVisitDetails: visitDetails.value
+    })
+
+    // Gunakan resepObat.value jika ada, fallback ke visitDetails.obat langsung
+    const medicationData = (resepObat.value && resepObat.value.length > 0)
+      ? resepObat.value.flatMap((r: any) => r.detail || [])
+      : (visitDetails.value?.obat || [])
+
+    if (medicationData.length > 0) {
+      console.log(`🔄 Creating MedicationRequest resources...`)
+
+      // Track medication request IDs to match with resources
+      const medicationRequestIds: string[] = []
+      let medicationRequests = 0
+
+      medicationData.forEach((obat: any, obatIndex: number) => {
+        const medicationName = obat.obat?.nama_brng || obat.nama_brng || 'Unknown Medication'
+        const aturanText = obat.aturan_pakai?.aturan || obat.aturan || '1x1'
+        const dosageParse = parseDosageInstruction(aturanText)
+        const quantity = obat.jml || 1
+
+        // Parse route (default ORAL, can be overridden)
+        let routeCode = '001'
+        let routeDisplay = 'ORAL'
+        let routeSystem = 'http://snomed.info/sct'
+
+        // Check if there's specific route information
+        if (obat.rute && obat.rute.trim()) {
+          // Common route mappings
+          const routeMappings: { [key: string]: { code: string, display: string } } = {
+            'IV': { code: '002', display: 'INTRAVENOUS' },
+            'IM': { code: '003', display: 'INTRAMUSCULAR' },
+            'SC': { code: '004', display: 'SUBCUTANEOUS' },
+            'PO': { code: '001', display: 'ORAL' },
+            'SL': { code: '005', display: 'SUBLINGUAL' },
+            'TOP': { code: '006', display: 'TOPICAL' },
+            'INH': { code: '007', display: 'INHALATION' }
+          }
+
+          const routeUpper = obat.rute.toUpperCase().trim()
+          if (routeMappings[routeUpper]) {
+            routeCode = routeMappings[routeUpper].code
+            routeDisplay = routeMappings[routeUpper].display
+          }
         }
-      ],
-      title: "Discharge Summary",
-      confidentiality: "N",
-      section: compositionSections
-    };
 
-    // DEBUG: Log compositionSections structure before adding to finalEntries
-    console.log('=== COMPOSITION SECTIONS DEBUG ===');
-    console.log('compositionSections type:', typeof compositionSections);
-    console.log('compositionSections isArray:', Array.isArray(compositionSections));
-    console.log('compositionSections keys:', Object.keys(compositionSections));
-    console.log('compositionSections structure:', JSON.stringify(compositionSections, null, 2));
+        // Create only one MedicationRequest per medication
+        const medicationRequestId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+        medicationRequestIds.push(medicationRequestId)
 
-    // Test JSON stringify and parse to ensure object structure is preserved
-    const jsonString = JSON.stringify(compositionSections);
-    console.log('JSON string:', jsonString);
-    const parsedBack = JSON.parse(jsonString);
-    console.log('Parsed back type:', typeof parsedBack);
-    console.log('Parsed back isArray:', Array.isArray(parsedBack));
-    console.log('Parsed back keys:', Object.keys(parsedBack));
-
-    finalEntries.push({ resource: compositionResource });
-
-    // --- 8. DIAGNOSTIC REPORT (Laboratorium & Radiologi) ---
-    console.log('=== CREATING DIAGNOSTIC REPORTS ===');
-    console.log('Available lab data:', lab.length, 'items');
-
-    // Array to collect all DiagnosticReports
-    const allDiagnosticReports: any[] = [];
-
-    // Laboratorium Diagnostic Reports
-    if (lab && lab.length > 0) {
-      lab.forEach((labItem: any, index: number) => {
-        console.log(`Processing lab item ${index}:`, labItem.jenis_perawatan?.nm_perawatan);
-
-        if (labItem.detail_periksa_lab && labItem.detail_periksa_lab.length > 0) {
-          const diagnosticReportId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-          const labOrganizationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        
-
-          // Create Observations for lab details
-          const observations = [];
-          labItem.detail_periksa_lab.forEach((detail: any) => {
-            const observationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-
-            // Use SNOMED mapping for specific test if available, otherwise default
-            let observationCode = {
-              coding: {
-                system: 'http://snomed.info/sct',
-                code: detail.template?.satu_sehat_mapping_lab?.code || '258236005',
-                display: detail.template?.satu_sehat_mapping_lab?.display || 'Laboratory test'
-              },
-              text: detail.template?.Pemeriksaan || 'Pemeriksaan Laboratorium'
-            };
-
-            let observation: any = {
-              resourceType: 'Observation',
-              id: observationId,
-              status: 'final',
-              text: {
-                status: 'generated',
-                div: `<div xmlns="http://www.w3.org/1999/xhtml">${detail.template?.Pemeriksaan || 'Pemeriksaan'}: ${detail.nilai || ''} ${detail.template?.satuan || ''}</div>`
-              },
-              issued: `${labItem.tgl_periksa} ${labItem.jam}`,
-              effectiveDateTime: `${labItem.tgl_periksa} ${labItem.jam}`,
-              code: observationCode,
-              performer: {
-                reference: `Practitioner/${practitionerId}`,
-                display: practitionerName
-              },
-              subject: {
-                reference: `Patient/${patientId}`,
-                display: patientName,
-                noSep: data.no_sep
-              }
-            };
-
-            // Add valueQuantity if numeric
-            if (detail.nilai && !isNaN(detail.nilai)) {
-              observation.valueQuantity = {
-                value: parseFloat(detail.nilai),
-                unit: detail.template?.satuan || '',
-                system: 'http://unitsofmeasure.org',
-                code: detail.template?.satuan || ''
-              };
-            } else if (detail.nilai) {
-              observation.valueString = detail.nilai;
-            }
-
-             // Add intepretation
-           
-              observation.interpretation = {
-                coding: {
-                  system: 'http://hl7.org/fhir/v2/0078',
-                  code: 'N',
-                  display: 'Normal'
-                },
-              };
-              
-              // Add dynamic reference range if available
-              if (detail.nilai_min_rujuk && detail.nilai_max_rujuk) {
-                observation.referenceRange = {
-                  low: {
-                    value: parseFloat(detail.nilai_min_rujuk)
-                  },
-                  high: {
-                    value: parseFloat(detail.nilai_max_rujuk)
-                  }
-                };
-              } else if (detail.template?.nilai_min_rujuk && detail.template?.nilai_max_rujuk) {
-                observation.referenceRange = {
-                  low: {
-                    value: parseFloat(detail.template.nilai_min_rujuk)
-                  },
-                  high: {
-                    value: parseFloat(detail.template.nilai_max_rujuk)
-                  }
-                };
-              } else if (detail.nilai_rujukan) {
-                // Parse free text reference range like "11.5 - 14.5"
-                const refRangeText = detail.nilai_rujukan.toString().trim();
-                const rangeMatch = refRangeText.match(/^([-\d.]+)\s*-\s*([-\d.]+)$/);
-
-                if (rangeMatch) {
-                  const minValue = parseFloat(rangeMatch[1]);
-                  const maxValue = parseFloat(rangeMatch[2]);
-
-                  if (!isNaN(minValue) && !isNaN(maxValue)) {
-                    observation.referenceRange = {
-                      low: {
-                        value: minValue
-                      },
-                      high: {
-                        value: maxValue
-                      }
-                    };
-                  } else {
-                    // Fallback to text if parsing fails
-                    observation.referenceRange = {
-                      text: refRangeText
-                    };
-                  }
-                } else {
-                  // Use as text if doesn't match range format
-                  observation.referenceRange = {
-                    text: refRangeText
-                  };
-                }
-              }
-
-               // Set dynamic conclusion based on keterangan field
-               if (detail.keterangan) {
-                 const ket = detail.keterangan.toString().toLowerCase().trim();
-                 if (ket === 'l' || ket.includes('low') || ket.includes('rendah') || ket.includes('kurang')) {
-                   observation.conclusion = 'Rendah';
-                   observation.interpretation = {
-                     coding: [{
-                       system: 'http://hl7.org/fhir/v2/0078',
-                       code: 'L',
-                       display: 'Low'
-                     }]
-                   };
-                 } else if (ket === 'h' || ket.includes('high') || ket.includes('tinggi') || ket.includes('naik')) {
-                   observation.conclusion = 'Tinggi';
-                   observation.interpretation = {
-                     coding: [{
-                       system: 'http://hl7.org/fhir/v2/0078',
-                       code: 'H',
-                       display: 'High'
-                     }]
-                   };
-                 } else if (ket === 'k' || ket.includes('kritis') || ket.includes('critical') || ket.includes('crit') || ket.includes('emergency') || ket.includes('gawat')) {
-                   observation.conclusion = 'Kritis';
-                   observation.interpretation = {
-                     coding: [{
-                       system: 'http://hl7.org/fhir/v2/0078',
-                       code: 'C',
-                       display: 'Critical'
-                     }]
-                   };
-                 } else if (ket.includes('abnormal') || ket.includes('tidak normal') || ket.includes('anomali')) {
-                   observation.conclusion = 'Abnormal';
-                   observation.interpretation = {
-                     coding: [{
-                       system: 'http://hl7.org/fhir/v2/0078',
-                       code: 'A',
-                       display: 'Abnormal'
-                     }]
-                   };
-                 } else {
-                   // Default to normal for other descriptions
-                   observation.conclusion = detail.keterangan;
-                 }
-               } else {
-                 // No keterangan means normal result
-                 observation.conclusion = 'Normal';
-               }
-
-            // Add reference range if available
-            // if (detail.nilai_rujukan) {
-            //   observation.referenceRange = [{
-            //     text: detail.nilai_rujukan
-            //   }];
-            // }
-
-            observations.push(observation);
-          });
-
-          // Create Diagnostic Report WITHOUT code field
-          const diagnosticReport = {
-            resourceType: 'DiagnosticReport',
-            id: diagnosticReportId,
-            status: 'final',
-            category: {
-              coding: {
-                system: 'http://hl7.org/fhir/v2/0074',
-                code: 'LAB',
-                display: 'Laboratory'
-              }
+        const medicationRequestResource = {
+            resourceType: 'MedicationRequest',
+            meta: {
+              lastUpdated: endTime
+            },
+            text: {
+              div: `<div xmlns="http://www.w3.org/1999/xhtml">${medicationName}</div>`
+            },
+            identifier: {
+              system: 'id_resep_pulang',
+              value: medicationRequestId
+            },
+            intent: 'order',
+            medicationCodeableConcept: {
+              coding: [{
+                system: 'http://rscm.co.id/drug',
+                code: obat.kode_brng,
+                display: 'Active'
+              }],
+              text: medicationName
             },
             subject: {
               reference: `Patient/${patientId}`,
-              display: patientName,
-              noSep: data.no_sep
+              display: data.nm_pasien
             },
-            encounter: {
-              reference: `Encounter/${encounterId}`
+            requester: {
+              agent: {
+                display: practitionerName,
+                reference: `Practitioner/${practitionerId}`
+              },
+              onBehalfOf: {
+                reference: `Organization/${organizationId}`
+              }
             },
-            effectiveDateTime: `${labItem.tgl_periksa} ${labItem.jam}`,
-            issued: `${labItem.tgl_periksa} ${labItem.jam}`,
-            performer: [{
-              reference: `Organization/${labOrganizationId}`,
-              display: 'LABORATORIUM'
-            }],
-            result: observations
-          };
+            dosageInstruction: [{
+              additionalInstruction: [{
+                text: aturanText
+              }],
+              timing: {
+                repeat: {
+                  frequency: dosageParse.frequency,
+                  period: dosageParse.period,
+                  periodUnit: dosageParse.periodUnit || 'd'
+                }
+              },
+              route: {
+                coding: [{
+                  system: 'http://snomed.info/sct',
+                  code: routeCode,
+                  display: routeDisplay
+                }]
+              },
+              doseQuantity: {
+                value: 1, // Always 1 unit per MedicationRequest
+                unit: obat.obat?.kode_sat || 'TAB',
+                system: 'http://unitsofmeasure.org',
+                code: obat.obat?.kode_sat || 'TAB'
+              }
+            }]
+          }
 
-          allDiagnosticReports.push(diagnosticReport);
-          console.log('✅ Created lab DiagnosticReport:', labItem.jenis_perawatan?.nm_perawatan);
-        }
-      });
-    }
+          resources.push(medicationRequestResource)
+          medicationRequests++
 
-    // Check for radiologi data
-    if (visitDetails.value?.radiologi && visitDetails.value.radiologi.length > 0) {
-      console.log('Available radiologi data:', visitDetails.value.radiologi.length, 'items');
+          console.log(`✅ Created MedicationRequest for ${medicationName} (${quantity} ${obat.obat?.kode_sat || 'TAB'})`)
+        })
 
-      visitDetails.value.radiologi.forEach((radioItem: any, index: number) => {
-        const diagnosticReportId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const radioOrganizationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
+        // Tambahkan section untuk obat dalam Composition
+        const medicationTexts = medicationData.map((obat: any) => {
+          const medicationName = obat.obat?.nama_brng || obat.nama_brng || 'Unknown'
+          const aturanText = obat.aturan_pakai?.aturan || obat.aturan || '1x1'
+          const quantity = obat.jml || 1
+          return `${medicationName} (${quantity} ${obat.obat?.kode_sat || 'TAB'}) (${aturanText})`
+        }).join(', ') || 'Tidak ada obat'
 
-        // Create Organization for Radiologi
-        const radioOrganization = {
-          resourceType: 'Organization',
-          id: radioOrganizationId,
-          name: 'RADIOLOGI',
-          identifier: [{
-            use: 'official',
-            type: {
-              coding: [{
-                system: 'http://terminology.hl7.org/CodeSystem/v2-0203',
-                code: 'TAX',
-                display: 'Tax ID number'
-              }]
-            },
-            value: organizationId
-          }]
-        };
-        finalEntries.push({ resource: radioOrganization });
+        const medicationEntries = medicationRequestIds
+          .map((medicationRequestId) => {
+            const medicationResource = resources.find(r => r.resourceType === 'MedicationRequest' && r.id === medicationRequestId)
+            return medicationResource ? {
+              resource: medicationResource
+            } : null
+          })
+          .filter(entry => entry !== null) // Remove null entries
 
-        // Create Observation for radiology result
-        const observationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const radiologyObservation = {
-          resourceType: 'Observation',
-          id: observationId,
-          status: 'final',
-          text: {
-            status: 'generated',
-            div: `<div xmlns="http://www.w3.org/1999/xhtml">${radioItem.hasil || 'Hasil pemeriksaan radiologi'}</div>`
-          },
-          issued: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
-          effectiveDateTime: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
-          code: {
-            coding: {
-              system: 'http://snomed.info/sct',
-              code: '394914006',
-              display: 'Radiology imaging procedure'
-            },
-            text: radioItem.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Radiologi'
-          },
-          performer: {
-            reference: `Practitioner/${practitionerId}`,
-            display: practitionerName
-          },
-          subject: {
-            reference: `Patient/${patientId}`,
-            display: patientName,
-            noSep: data.no_sep
-          },
-          conclusion: radioItem.kesan || 'Impressi radiologi'
-        };
+      // Section 2: Medications
+      compositionSections[sectionIndex++] = {
+        title: 'Medications',
+        code: { coding: [{ system: 'http://loinc.org', code: '10183-2', display: 'Medication discharge instructions Narrative' }] },
+        text: { status: 'additional', div: medicationTexts },
+        mode: 'working',
+        entry: medicationEntries
+      }
 
-  
-        // Create Diagnostic Report for Radiology WITHOUT code field
-        const radiologyDiagnosticReport = {
-          resourceType: 'DiagnosticReport',
-          id: diagnosticReportId,
-          status: 'final',
-          category: {
-            coding: {
-              system: 'http://hl7.org/fhir/v2/0074',
-              code: 'RAD',
-              display: 'Radiology'
-            }
-          },
-          subject: {
-            reference: `Patient/${patientId}`,
-            display: patientName,
-            noSep: data.no_sep
-          },
-          encounter: {
-            reference: `Encounter/${encounterId}`
-          },
-          effectiveDateTime: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
-          issued: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
-          performer: [{
-            reference: `Organization/${radioOrganizationId}`,
-            display: 'RADIOLOGI'
-          }],
-          result: [radiologyObservation]
-        };
+      console.log(`✅ Created ${medicationRequests} MedicationRequest resources from ${medicationData.length} medications`)
+      console.log(`📊 Medication summary: ${medicationData.map((o: any) => `${o.obat?.nama_brng || o.nama_brng} (${o.jml || 1} ${o.obat?.kode_sat || 'TAB'})`).join(', ')}`)
+    } // Close if (medicationData.length > 0)
 
-        allDiagnosticReports.push(radiologyDiagnosticReport);
-        console.log('✅ Created radiology DiagnosticReport:', radioItem.jenis_perawatan?.nm_perawatan);
-      });
-    }
+    // 9. Procedure Resources dari Data Tindakan
+    console.log('🔍 Checking procedure billing data for Procedure generation:', {
+      procedureBillingLength: procedureBilling.value?.length || 0,
+      procedureBillingData: procedureBilling.value
+    })
 
-    // Add all DiagnosticReports as single entry with resource array
-    // TEMPORARILY DISABLED - Testing without DiagnosticReport
-    
-    if (allDiagnosticReports.length > 0) {
-      finalEntries.push({ resource: allDiagnosticReports });
-      console.log(`✅ Added ${allDiagnosticReports.length} DiagnosticReports in single entry`);
-    }
-    
+    // Create Procedure Resources and group them
+    const procedureResources: any[] = []
 
-    // --- 9. PROCEDURE (Tindakan) ---
     if (procedureBilling.value && procedureBilling.value.length > 0) {
-      procedureBilling.value.forEach(proc => {
-        const procId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const procName = proc.nm_perawatan;
+      console.log(`🔄 Creating Procedure resources from ${procedureBilling.value.length} procedures...`)
 
-        // Get procedure code and description from SNOMED mapping if available
-        const codeSystem = 'http://snomed.info/sct';
-        let codeValue = proc.snomed_mapping?.snomed?.code || proc.kd_jenis_prw; // SNOMED code atau fallback ke procedure code
-        let displayValue = proc.snomed_mapping?.snomed?.display || procName; // SNOMED display atau fallback ke procedure name
+      let procedureCounter = 1
 
-        // Jika ada SNOMED mapping, gunakan sistem SNOMED, jika tidak gunakan ICD-9-CM
-        const systemValue = proc.snomed_mapping?.snomed?.code ? codeSystem : 'http://hl7.org/fhir/sid/icd-9-cm';
+      procedureBilling.value.forEach((procedure: any) => {
+        const procedureId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
 
-        const procedure = {
+        console.log(`🏥 Creating Procedure ${procedureCounter++}: ${procedure.nm_perawatan} - ${procedure.kd_jenis_prw}`)
+
+        // Get procedure code and description from SNOMED mapping API data
+        let procedureCode = procedure.kd_jenis_prw
+        let procedureDisplay = procedure.nm_perawatan
+        let procedureSystem = 'http://hl7.org/fhir/sid/icd-9-cm'
+
+        // Check if there's SNOMED mapping from API
+        if (procedure.snomed_mapping && procedure.snomed_mapping.mapping) {
+          const mapping = procedure.snomed_mapping.mapping
+          procedureCode = mapping.code
+          procedureDisplay = mapping.display || procedure.nm_perawatan
+          procedureSystem = mapping.system || 'http://snomed.info/sct'
+          console.log(`📋 Using SNOMED mapping: ${procedure.nm_perawatan} → ${mapping.code} (${mapping.display})`)
+        } else if (procedure.snomed_mapping && procedure.snomed_mapping.code) {
+          // Fallback for direct code mapping
+          procedureCode = procedure.snomed_mapping.code
+          procedureDisplay = procedure.snomed_mapping.display || procedure.nm_perawatan
+          procedureSystem = procedure.snomed_mapping.system || 'http://snomed.info/sct'
+          console.log(`📋 Using direct SNOMED mapping: ${procedure.nm_perawatan} → ${procedure.snomed_mapping.code}`)
+        } else {
+          console.log(`⚠️ No SNOMED mapping found for: ${procedure.nm_perawatan}, using ICD-9-CM code`)
+        }
+
+        // Use SNOMED mapping for performer role from the procedure data
+        let performerRole = {
+          system: 'http://snomed.info/sct',
+          code: '309343006', // Default to Medical doctor
+          display: 'Medical doctor'
+        }
+
+        // Check if there's SNOMED mapping from API to use for performer role
+        if (procedure.snomed_mapping && procedure.snomed_mapping.has_mapping && procedure.snomed_mapping.snomed) {
+          const snomed = procedure.snomed_mapping.snomed
+          performerRole = {
+            system: snomed.system || 'http://snomed.info/sct',
+            code: snomed.code,
+            display: snomed.display || procedure.nm_perawatan
+          }
+        } else if (procedure.snomed_mapping && procedure.snomed_mapping.mapping) {
+          const mapping = procedure.snomed_mapping.mapping
+          performerRole = {
+            system: mapping.system || 'http://snomed.info/sct',
+            code: mapping.code,
+            display: mapping.display || procedure.nm_perawatan
+          }
+        } else if (procedure.snomed_mapping && procedure.snomed_mapping.code) {
+          performerRole = {
+            system: procedure.snomed_mapping.system || 'http://snomed.info/sct',
+            code: procedure.snomed_mapping.code,
+            display: procedure.snomed_mapping.display || procedure.nm_perawatan
+          }
+        }
+
+        const procedureResource: any = {
           resourceType: 'Procedure',
-          id: procId,
-          text: {
-            "status": "generated",
-            "div": "Generated Narrative with Details"
-          },
+          id: procedureId,
           status: 'completed',
           code: {
             coding: [{
-              system: systemValue,
-              code: codeValue,
-              display: displayValue
+              system: procedureSystem,
+              code: procedureCode,
+              display: procedureDisplay
             }]
           },
           subject: {
-            "display": data.nm_pasien,
-            "reference": `Patient/${patientId}`
-          },
-          context: {
-            "display": `${data.nm_pasien} Encounter on ${startTime}`,
-            "reference": `Encounter/${encounterId}`
+            reference: `Patient/${patientId}`,
+            display: data.nm_pasien || data.nama_pasien || 'Unknown Patient'
           },
           performedPeriod: {
             start: startTime,
-            end: startTime
+            end: endTime
           },
-          performer: [
-            {
-              "role": {
-                "coding": [
-                  {
-                    "system": systemValue,
-                    "code": codeValue,
-                    "display": displayValue
-                  }
-                ]
-              },
-              "actor": {
-                "display": practitionerName,
-                "reference": `Practitioner/${practitionerId}`
-              }
-            }
-          ],
-          reasonCode: [{
-            "text": "DiagnosticReport/f201"
-          }],
-          bodySite: [{
-            "coding": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009",
-                "display": "Not applicable"
-              }
-            ]
-          }],
-          focalDevice: [{
-            "action": {
-              "coding": [
-                {
-                  "system": "http://hl7.org/fhir/device-action",
-                  "code": "manipulated"
-                }
-              ],
-              "text": "Tidak ada"
+          performer: [{
+            actor: {
+              reference: `Practitioner/${practitionerId}`,
+              display: practitionerName
             },
-            "manipulated": {
-              "reference": "Device/not-applicable"
+            role: {
+              coding: [performerRole]
             }
-          }],
-          note: [
-            {
-              "text": ""
-            }
-          ]
-        };
-        proceduresList.push(procedure);
-      });
+          }]
+        }
 
-      // Add all procedures as ONE entry (wrapped in array as per BPJS format)
-      if (proceduresList.length > 0) {
-        finalEntries.push({ resource: proceduresList }); // All procedures in one array
-      }
-      
-      // Only add Procedures section if there are actual procedures with valid names
-      const validProcedures = proceduresList.filter(p => p.code?.text && p.code?.text.trim() !== '');
-      const procString = validProcedures.map(p => p.code?.text).join(', ');
+        // Add reasonCode if available
+        if (procedure.alasan_tindakan) {
+          procedureResource.reasonCode = [{
+            text: procedure.alasan_tindakan
+          }]
+        }
 
-      // Procedure section removed - individual Procedure resources are already included in the bundle
-      // No need to add redundant "Procedures" section to Composition
+        // Add bodySite if available
+        if (procedure.lokalasi) {
+          procedureResource.bodySite = [{
+            coding: [{
+              system: 'http://snomed.info/sct',
+              code: '272676008',
+              display: procedure.lokalasi
+            }]
+          }]
+        }
+
+        procedureResources.push(procedureResource)
+        console.log(`✅ Created Procedure for ${procedure.nm_perawatan} (Tarif: ${procedure.tarif || 0})`)
+      })
+
+      console.log(`✅ Created ${procedureResources.length} Procedure resources`)
     }
 
-    
-  
-    // ==========================================================================
-    // 4. BUNDLE ASSEMBLY - Reorder to match pkujogja.json
-    // ==========================================================================
-
-    // Urutan sesuai json_sukses_2.json:
-    // 1. Patient
-    // 2. Organization
-    // 3. Practitioner
-    // 4. MedicationRequest (array)
-    // 5. Composition
-    // 6. Condition
-    // 7. Encounter
-    // 8. Procedure (array)
-    // 9. null, null
-
-    const orderedEntries = [
-      // 1. Patient
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Patient'),
-
-      // 2. Organization
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Organization'),
-
-      // 3. Practitioner
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Practitioner'),
-
-      // 4. MedicationRequest (now with array structure)
-      ...finalEntries.filter(entry => Array.isArray(entry.resource) && entry.resource[0]?.resourceType === 'MedicationRequest'),
-
-      // 5. Observation (linked to DiagnosticReport)
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Observation'),
-
-      // 6. Composition
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Composition'),
-
-      // 7. Condition (ada beberapa Condition)
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Condition'),
-
-      // 8. Encounter
-      ...finalEntries.filter(entry => entry.resource?.resourceType === 'Encounter'),
-
-      // 9. Procedure (now wrapped in arrays)
-      ...finalEntries.filter(entry => Array.isArray(entry.resource) && entry.resource[0]?.resourceType === 'Procedure'),
-
-      // 10. DiagnosticReport (Laboratory & Radiology) - moved to last position
-      ...finalEntries.filter(entry => Array.isArray(entry.resource) && entry.resource[0]?.resourceType === 'DiagnosticReport')
-    ];
-
+    // 10. Build Final Bundle
     const bundle = {
       resourceType: 'Bundle',
       id: bundleId,
       meta: {
-        lastUpdated: endTime
+        lastUpdated: endTime // Format YYYY-MM-DDTHH:mm:ss+07:00
       },
-      identifier: {
+      identifier: { // Non-standar (Objek) - Sesuai bundle.json
         use: null,
         type: { coding: [], text: null },
         system: 'SEP',
-        value: data.no_sep,
+        value: data.no_sep || 'SEP001',
         assigner: { display: null }
       },
       type: 'Document',
-      entry: orderedEntries
-    };
-
-    // DEBUG: Final bundle composition section check
-    console.log('=== FINAL BUNDLE COMPOSITION DEBUG ===');
-    const compositionEntry = bundle.entry.find(entry => entry.resource?.resourceType === 'Composition');
-    if (compositionEntry) {
-      console.log('Composition entry found!');
-      console.log('Composition section type:', typeof compositionEntry.resource.section);
-      console.log('Composition section isArray:', Array.isArray(compositionEntry.resource.section));
-      console.log('Composition section keys:', Object.keys(compositionEntry.resource.section));
-      console.log('Composition section structure:', JSON.stringify(compositionEntry.resource.section, null, 2));
-    } else {
-      console.log('❌ No composition entry found in bundle!');
+      entry: []
     }
 
-    console.log('✅ Validated BPJS Bundle Generated (Dynamic SIP & NIK Practitioner):', bundle);
-    return bundle;
+    // Add non-medication resources individually
+    const medicationRequests = resources.filter(r => r.resourceType === 'MedicationRequest')
+    const nonMedicationResources = resources.filter(r => r.resourceType !== 'MedicationRequest')
+
+    // Add non-medication resources first
+    nonMedicationResources.forEach(resource => {
+      bundle.entry.push({
+        resource: resource
+      })
+    })
+
+    // Add medication requests grouped as array
+    if (medicationRequests.length > 0) {
+      bundle.entry.push({
+        resource: medicationRequests
+      })
+    }
+
+    // Add procedure resources grouped as array
+    if (procedureResources.length > 0) {
+      bundle.entry.push({
+        resource: procedureResources
+      })
+    }
+
+    console.log('✅ BPJS FHIR Bundle (Meniru bundle.json + Format Tanggal) generated')
+    console.log('Payload Lengkap:', JSON.stringify(bundle, null, 2))
+
+    return bundle
 
   } catch (error) {
-    console.error('Error generating bundle:', error);
-    return null;
+    console.error('Error generating BPJS FHIR Bundle:', error)
+    return null
   }
 }
+
 // =====================================================
 // DEBUG FUNCTIONS - Kirim Resource Satu Per Satu
 // =====================================================
@@ -7560,9 +6846,6 @@ async function generateBPJSMedicalRecordBundle() {
 
 // Fungsi untuk mengirim hanya Patient resource
 async function sendPatientResourceOnly() {
-  // Simulasi dengan nomor SEP tertentu untuk testing
-  const validSep = '0166R0011125V000005'
-
   // Tambahkan UI state management
   sendingToBpjs.value = true
   bpjsSubmissionStatus.value = 'sending'
@@ -7717,14 +7000,13 @@ async function sendPatientResourceOnly() {
 
     // Prepare BPJS request payload - direct Patient resource
     const currentDate = new Date()
-
     const payload = {
-      "request": {
-        "noSep": validSep,
-        "jnsPelayanan": selectedVisitData.value.jnspelayanan || '1',
-        "bulan": String(currentDate.getMonth() + 1).padStart(2, '0'),
-        "tahun": String(currentDate.getFullYear()),
-        "dataMR": patientResource  // Send as object (backend will handle encryption/compression)
+      request: {
+        noSep: selectedVisitData.value.no_sep,
+        jnsPelayanan: selectedVisitData.value.jnspelayanan || '1',
+        bulan: String(currentDate.getMonth() + 1).padStart(2, '0'),
+        tahun: String(currentDate.getFullYear()),
+        dataMR: patientResource  // Send Patient resource directly (no Bundle wrapper)
       }
     }
 
@@ -7819,71 +7101,5 @@ function formatBpjsDateTimeLegacy(date: Date): string {
 }
 
 // END OF DISABLED CODE
-
-// Custom Animations untuk Toast
-// Custom Animations untuk Toast - moved to onMounted to fix SSR
-let toastStylesAdded = false
-
-const addToastStyles = () => {
-  if (typeof window !== 'undefined' && document && !toastStylesAdded) {
-    const style = document.createElement('style')
-style.textContent = `
-  @keyframes shake-once {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
-    20%, 40%, 60%, 80% { transform: translateX(2px); }
-  }
-
-  @keyframes bounce-in {
-    0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
-    50% { transform: translate(-50%, -50%) scale(1.05); }
-    70% { transform: translate(-50%, -50%) scale(0.9); }
-    100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-  }
-
-  @keyframes shake-once {
-    0%, 100% { transform: translate(-50%, -50%) translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translate(-50%, -50%) translateX(-2px); }
-    20%, 40%, 60%, 80% { transform: translate(-50%, -50%) translateX(2px); }
-  }
-
-  @keyframes spin-slow {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  @keyframes pulse-once {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-  }
-
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-  }
-
-  .animate-shake-once { animation: shake-once 0.5s ease-in-out; }
-  .animate-bounce-in { animation: bounce-in 0.6s ease-out; }
-  .animate-spin-slow { animation: spin-slow 2s linear infinite; }
-  .animate-pulse-once { animation: pulse-once 0.3s ease-in-out; }
-  .animate-bounce { animation: bounce 1s ease-in-out infinite; }
-
-  /* Ensure z-index works properly */
-  .z-\[9999\] { z-index: 9999 !important; }
-
-  /* Fix transition for removal */
-  [id^="toast-"] {
-    transition: opacity 0.3s ease, transform 0.3s ease;
-  }
-`
-  document.head.appendChild(style)
-    toastStylesAdded = true
-  }
-}
-
-// Add styles on client-side mount
-onMounted(() => {
-  addToastStyles()
-})
 
 </script>

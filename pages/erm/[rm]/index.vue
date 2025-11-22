@@ -27,7 +27,9 @@ const { data, error, refresh, status } = await useFetch(`${config.public.API_V2_
       { "relation": "reg_periksa" },
       { "relation": "tanggal_pulang" },
       { "relation": "status_klaim" },
-      { "relation": "groupStage" }
+      { "relation": "groupStage" },
+      { "relation": "pasien" },
+      { "relation": "rsia_klaim_idrg" },
     ]
   })
 })
