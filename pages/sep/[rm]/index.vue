@@ -24,10 +24,13 @@ const { data, error, refresh, status } = await useFetch(`${config.public.API_V2_
       { "field": "nomr", "operator": "=", "value": rm.value },
     ],
     "includes": [
-      { "relation": "reg_periksa" },
-      { "relation": "tanggal_pulang" },
-      { "relation": "status_klaim" },
-      { "relation": "groupStage" }
+      "reg_periksa",
+      "reg_periksa.poliklinik",
+      "reg_periksa.dokter",
+      "tanggal_pulang",
+      "status_klaim",
+      "groupStage",
+      "rsia_klaim_idrg"
     ]
   })
 })

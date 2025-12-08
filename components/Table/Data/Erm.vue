@@ -13,7 +13,7 @@
     </template>
 
     <!-- TAB: Riwayat Pemeriksaan & Coding -->
-    <div class="space-y-4">
+    <div id="section-riwayat-pemeriksaan" class="space-y-4">
       <!-- Patient Info Header -->
       <div v-if="data?.data && data.data.length > 0" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl">
         <div class="flex items-center gap-3">
@@ -98,8 +98,16 @@
                 <UButton @click="copyToClipboard(row.no_sep)" variant="link" color="sky" size="xs" icon="i-tabler-copy" />
               </div>
             </template>
-            <template #jnspelayanan-data="{ row }">
-              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            <template #jenis-data="{ row }">
+              <UBadge
+                :label="row.jnspelayanan == 1 ? 'Rawat Inap' : 'Rawat Jalan'"
+                :color="row.jnspelayanan == 1 ? 'blue' : 'green'"
+                variant="soft"
+                size="xs"
+              />
+            </template>
+            <template #poliklinik-data="{ row }">
+              <span class="text-sm">{{ row.nmpolitujuan || '-' }}</span>
             </template>
             <template #tgl_masuk-data="{ row }">
               <div>
@@ -188,8 +196,13 @@
               {{ new Date(row.tglsep).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) }}
             </template>
 
-            <template #jenis_data="{ row }">
-              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            <template #jenis-data="{ row }">
+              <UBadge
+                :label="row.jnspelayanan == 1 ? 'Rawat Inap' : 'Rawat Jalan'"
+                :color="row.jnspelayanan == 1 ? 'blue' : 'green'"
+                variant="soft"
+                size="xs"
+              />
             </template>
 
             <template #poliklinik-data="{ row }">
@@ -200,13 +213,6 @@
               <span class="text-sm">{{ row.reg_periksa?.dokter?.nm_dokter || '-' }}</span>
             </template>
 
-            <template #coding_status-data="{ row }">
-              <UBadge
-                :label="getCodingStatusLabel(row)"
-                :color="getCodingStatusColor(row)"
-                variant="soft"
-              />
-            </template>
 
             <template #actions-data="{ row }">
               <UButton
@@ -233,9 +239,46 @@
             @select="handleCombinedRowClick"
           >
             <template #no_sep-data="{ row }">
-              <div class="flex items-center gap-1">
-                <span class="font-mono text-sm">{{ row.no_sep }}</span>
-                <UButton @click="copyToClipboard(row.no_sep)" variant="link" color="sky" size="xs" icon="i-tabler-copy" />
+              <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-1">
+                  <span class="font-mono text-sm">{{ row.no_sep }}</span>
+                  <UButton @click="copyToClipboard(row.no_sep)" variant="link" color="sky" size="xs" icon="i-tabler-copy" />
+                </div>
+                <!-- ERM BPJS Status Badge -->
+                <div class="flex gap-1 items-center">
+                  <!-- ERM BPJS Badge -->
+                  <template v-if="row.no_sep && ermBpjsStatus[row.no_sep] === true">
+                    <UTooltip text="ERM BPJS Terkirim (Status 200)" :popper="{ placement: 'top' }"
+                      :ui="{ background: 'bg-emerald-200 dark:bg-emerald-900' }">
+                      <UBadge size="xs" color="emerald" variant="subtle" class="flex items-center gap-1">
+                        <UIcon name="i-tabler-file-check" class="text-emerald-400 h-4.5 w-4.5" />
+                        ERM BPJS
+                      </UBadge>
+                    </UTooltip>
+                  </template>
+                  <!-- Manual Refresh Button for Debugging -->
+                  <template v-else-if="row.no_sep">
+                    <UButton
+                      @click="() => refreshErmStatus(row.no_sep)"
+                      size="xs"
+                      color="gray"
+                      variant="subtle"
+                      :loading="isLoading(row.no_sep)"
+                      class="text-xs">
+                      <UIcon name="i-tabler-refresh" class="h-3 w-3" />
+                    </UButton>
+                  </template>
+                  <!-- Loading ERM Status -->
+                  <template v-else-if="row.no_sep && isLoading(row.no_sep)">
+                    <UTooltip text="Checking ERM BPJS Status..." :popper="{ placement: 'top' }"
+                      :ui="{ background: 'bg-amber-200 dark:bg-amber-900' }">
+                      <UBadge size="xs" color="amber" variant="subtle" class="flex items-center gap-1">
+                        <UIcon name="i-tabler-loader-2" class="text-amber-400 h-4.5 w-4.5 animate-spin" />
+                        ERM
+                      </UBadge>
+                    </UTooltip>
+                  </template>
+                </div>
               </div>
             </template>
 
@@ -243,16 +286,34 @@
               <span class="font-mono text-xs">{{ row.no_rawat }}</span>
             </template>
 
-            <template #jenis_data="{ row }">
-              <span>{{ row.jnspelayanan == 1 ? "Rawat Inap" : "Rawat Jalan" }}</span>
+            <template #jenis-data="{ row }">
+              <UBadge
+                :label="row.jnspelayanan == 1 ? 'Rawat Inap' : 'Rawat Jalan'"
+                :color="row.jnspelayanan == 1 ? 'blue' : 'green'"
+                variant="soft"
+                size="xs"
+              />
             </template>
 
             <template #poliklinik-data="{ row }">
-              <span class="text-sm">{{ row.reg_periksa?.poliklinik?.nm_poli || row.poliklinik || '-' }}</span>
+              <!-- Fallback: gunakan data yang sudah ada di BridgingSep -->
+              <span class="text-sm">{{
+                row.reg_periksa?.poliklinik?.nm_poli ||
+                row.poliklinik ||
+                row.nmpolitujuan ||
+                '-'
+              }}</span>
             </template>
 
             <template #dokter-data="{ row }">
-              <span class="text-sm">{{ row.reg_periksa?.dokter?.nm_dokter || row.dokter || '-' }}</span>
+              <!-- Fallback: gunakan data yang sudah ada di BridgingSep -->
+              <span class="text-sm">{{
+                row.reg_periksa?.dokter?.nm_dokter ||
+                row.dokter ||
+                row.nmdpdjp ||
+                row.nmdpjplayanan ||
+                '-'
+              }}</span>
             </template>
 
             <template #status_klaim-data="{ row }">
@@ -261,26 +322,18 @@
                       variant="soft"
                       size="sm"
                       class="w-min"
-                      :label="getKlaimStatus(row)"
+                      :label="getKlaimStatusSync(row)"
                       :class="{
-                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': getKlaimStatus(row).toLowerCase() === 'sent',
-                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': getKlaimStatus(row).toLowerCase() !== 'sent'
+                        'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200': getKlaimStatusSync(row).toLowerCase() === 'sent',
+                        'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200': getKlaimStatusSync(row).toLowerCase() !== 'sent'
                       }"
                     />
                   </ClientOnly>
             </template>
 
-            <template #coding_status-data="{ row }">
-              <UBadge
-                :label="getCodingStatusLabel(row)"
-                :color="getCodingStatusColor(row)"
-                variant="soft"
-              />
-            </template>
 
             <template #actions-data="{ row }">
               <div class="flex gap-2">
-             
                 <UButton
                   v-if="row.hasClaim"
                   icon="i-tabler-file-text"
@@ -304,37 +357,44 @@
       <p>Klik salah satu baris riwayat di atas untuk melihat detail pemeriksaan.</p>
     </div>
 
+    <!-- SIDEBAR COMPONENTS REMOVED -->
+
     <!-- ========================================= -->
-    <!-- DETAIL PEMERIKSAAN SECTION (NO MODAL)   -->
+    <!-- DETAIL PEMERIKSAAN & CODING SNOMED       -->
     <!-- ========================================= -->
-    <div v-if="selectedVisitData" class="mt-8 space-y-6">
+    <div id="section-detail-pemeriksaan" v-if="selectedVisitData" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 ml-16 mt-5">
       <!-- Header Detail -->
-      <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl shadow-lg">
-        <div class="flex justify-between items-start">
-          <div class="flex-1">
-            <h3 class="text-xl font-bold mb-3">Detail Pemeriksaan & Coding SNOMED</h3>
+      <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-4 rounded-t-xl border-b border-blue-200 dark:border-blue-800">
+        <div class="flex justify-between items-center">
+          <div class="flex items-center gap-2">
+            <UIcon name="i-tabler-file-description" class="w-5 h-5" />
+            <h4 class="font-semibold">Detail Pemeriksaan & Coding SNOMED</h4>
+          </div>
+        </div>
+      </div>
 
-            <!-- Status Klaim Section -->
-            <div class="mb-3">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-sm font-medium">Status Klaim Kemenkes:</span>
-                <UBadge
-                  :label="getKlaimStatusBadge(selectedVisitData)"
-                  :color="getKlaimStatusColor(selectedVisitData) as any"
-                  variant="soft"
-                  size="sm"
-                />
-              </div>
-              <div v-if="getKlaimStatus(selectedVisitData) === 'sent'" class="text-xs text-blue-100">
-                ✓ Detail ERM tersedia untuk ditinjau dan coding
-              </div>
-              <div v-else class="text-xs text-yellow-100">
-                ⚠ Detail ERM hanya tersedia jika status klaim sudah "sent"
-              </div>
-            </div>
+      <div class="p-6 space-y-4">
+        <!-- Status Klaim Section -->
+        <div class="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-sm font-medium text-blue-800 dark:text-blue-200">Status Klaim Kemenkes:</span>
+            <UBadge
+              :label="getKlaimStatusBadge(selectedVisitData)"
+              :color="getKlaimStatusColor(selectedVisitData) as any"
+              variant="soft"
+              size="sm"
+            />
+          </div>
+          <div v-if="getKlaimStatusSync(selectedVisitData) === 'sent'" class="text-xs text-blue-700 dark:text-blue-300">
+            ✓ Detail ERM tersedia untuk ditinjau dan coding
+          </div>
+          <div v-else class="text-xs text-yellow-700 dark:text-yellow-300">
+            ⚠ Detail ERM hanya tersedia jika status klaim sudah "sent"
+          </div>
+        </div>
 
-            <!-- Visit Info -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
+        <!-- Visit Info -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
               <div>
                 <span class="opacity-75">No. Rawat:</span>
                 <span class="ml-2 font-semibold">{{ selectedVisitData.no_rawat }}</span>
@@ -353,21 +413,256 @@
               </div>
             </div>
           </div>
-
-          </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loadingVisitDetails" class="flex justify-center items-center py-12">
+      <!-- Loading State - Show immediately when Detail is clicked -->
+      <div v-if="selectedVisitData && loadingVisitDetails" class="flex justify-center items-center py-12">
         <UIcon name="i-tabler-loader-2" class="animate-spin text-3xl mr-3 text-blue-500" />
         <span class="text-gray-600">Memuat detail pemeriksaan...</span>
       </div>
+  
 
-      <!-- Detail Content -->
-      <div v-else-if="visitDetails" class="space-y-6">
+    <!-- FLOATING TAB NAVIGATION -->
+      <div ref="floatingNav" class="fixed left-4 top-1/2 -translate-y-1/2 z-50 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-2 space-y-2 transition-all duration-300 opacity-0 invisible pointer-events-none">
+        <!-- Detail Pemeriksaan -->
+        <button
+          @click="scrollToSection('detail-pemeriksaan')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'detail-pemeriksaan'
+              ? 'bg-blue-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/20 hover:text-blue-600'
+          ]"
+          :title="'Detail Pemeriksaan'"
+        >
+          <UIcon name="i-tabler-file-description" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Detail</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Detail Pemeriksaan
+          </div>
+        </button>
+
+        <!-- Diagnosis -->
+        <button
+          @click="scrollToSection('diagnosis')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'diagnosis'
+              ? 'bg-red-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/20 hover:text-red-600'
+          ]"
+          :title="'Diagnosis'"
+        >
+          <UIcon name="i-tabler-stethoscope" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Diagnosis</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Diagnosis ICD-10
+          </div>
+        </button>
+
+        <!-- Procedures -->
+        <button
+          @click="scrollToSection('procedures')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'procedures'
+              ? 'bg-purple-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/20 hover:text-purple-600'
+          ]"
+          :title="'Prosedur'"
+        >
+          <UIcon name="i-tabler-bone" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Prosedur</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Prosedur ICD-9
+          </div>
+        </button>
+
+        <!-- Pemeriksaan Rawat Jalan (SOAP) -->
+        <button
+          @click="scrollToSection('cppt-pemeriksaan-ralan')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'cppt-pemeriksaan-ralan'
+              ? 'bg-blue-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/20 hover:text-blue-600'
+          ]"
+          :title="'Pemeriksaan Rawat Jalan (SOAP)'"
+        >
+          <UIcon name="i-tabler-notes" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">SOAP-R</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Pemeriksaan Rawat Jalan (SOAP)
+          </div>
+        </button>
+
+        <!-- Pemeriksaan Rawat Inap (SOAP) -->
+        <button
+          @click="scrollToSection('pemeriksaan-ranap')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'pemeriksaan-ranap'
+              ? 'bg-green-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-900/20 hover:text-green-600'
+          ]"
+          :title="'Pemeriksaan Rawat Inap (SOAP)'"
+        >
+          <UIcon name="i-tabler-bed" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">SOAP-I</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Pemeriksaan Rawat Inap (SOAP)
+          </div>
+        </button>
+
+        <!-- Laboratory -->
+        <button
+          @click="scrollToSection('laboratory')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'laboratory'
+              ? 'bg-orange-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-orange-100 dark:hover:bg-orange-900/20 hover:text-orange-600'
+          ]"
+          :title="'Laboratorium'"
+        >
+          <UIcon name="i-tabler-test-pipe" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Lab</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Laboratorium
+          </div>
+        </button>
+
+        <!-- Medications -->
+        <button
+          @click="scrollToSection('medications')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'medications'
+              ? 'bg-green-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-900/20 hover:text-green-600'
+          ]"
+          :title="'Resep Obat'"
+        >
+          <UIcon name="i-tabler-pills" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Resep</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Resep Obat
+          </div>
+        </button>
+
+        <!-- Billing -->
+        <button
+          @click="scrollToSection('tarif-dan-tindakan')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'tarif-dan-tindakan'
+              ? 'bg-blue-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900/20 hover:text-blue-600'
+          ]"
+          :title="'Tarif dan Tindakan'"
+        >
+          <UIcon name="i-tabler-receipt" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Billing</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Tarif & Tindakan
+          </div>
+        </button>
+
+        <!-- Radiology -->
+        <button
+          @click="scrollToSection('radiology')"
+          :class="[
+            'w-14 h-14 rounded-xl flex flex-col items-center justify-center transition-all duration-200 relative group',
+            activeSection === 'radiology'
+              ? 'bg-cyan-600 text-white shadow-lg scale-110'
+              : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/20 hover:text-cyan-600'
+          ]"
+          :title="'Radiologi'"
+        >
+          <UIcon name="i-tabler-x-ray" class="w-5 h-5 mb-1" />
+          <span class="text-xs font-medium">Radio</span>
+          <!-- Tooltip -->
+          <div class="absolute left-full ml-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+            Radiologi
+          </div>
+        </button>
+      </div>
+
+      <!-- Detail Content with left margin for floating nav -->
+      <div v-if="selectedVisitData && !loadingVisitDetails && visitDetails" class="space-y-6 ml-16 mt-5" id="section-content">
+
+        <!-- INFORMASI KUNJUNGAN (RAWAT INAP) -->
+        <div id="section-informasi-kunjungan" v-if="visitDetails && visitDetails.kamar_inap && selectedVisitData && selectedVisitData.jnspelayanan == 1" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div class="bg-indigo-50 dark:bg-indigo-900/20 px-6 py-4 rounded-t-xl border-b border-indigo-200 dark:border-indigo-800">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-tabler-hospital" class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h4 class="font-semibold text-indigo-800 dark:text-indigo-200">Informasi Kunjungan</h4>
+            </div>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <!-- Reason for Admission -->
+              <div v-if="visitDetails.kamar_inap.diagnosa_awal" class="col-span-full">
+                <div class="flex items-start gap-3 p-4 bg-indigo-50 dark:bg-indigo-900/10 rounded-lg">
+                  <UIcon name="i-tabler-clipboard-text" class="w-5 h-5 text-indigo-600 dark:text-indigo-400 mt-0.5" />
+                  <div class="flex-1">
+                    <h5 class="font-semibold text-indigo-800 dark:text-indigo-200 mb-2">Alasan Masuk (Reason for Admission)</h5>
+                    <p class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ visitDetails.kamar_inap.diagnosa_awal }}</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Informasi Kamar -->
+              <div>
+                <h5 class="font-medium text-indigo-800 dark:text-indigo-200 mb-2">Informasi Kamar</h5>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Kode Kamar:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ visitDetails.kamar_inap.kd_kamar || '-' }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Kelas:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ visitDetails.kamar_inap.kelas || '-' }}</span>
+                  </div>
+                  <div v-if="visitDetails.kamar_inap.tgl_masuk" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Tgl Masuk:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ new Date(visitDetails.kamar_inap.tgl_masuk).toLocaleDateString('id-ID') }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Status Pulang -->
+              <div>
+                <h5 class="font-medium text-indigo-800 dark:text-indigo-200 mb-2">Status Pulang</h5>
+                <div class="space-y-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Status:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ visitDetails.kamar_inap.stts_pulang || '-' }}</span>
+                  </div>
+                  <div v-if="visitDetails.kamar_inap.tgl_keluar" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Tgl Keluar:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ new Date(visitDetails.kamar_inap.tgl_keluar).toLocaleDateString('id-ID') }}</span>
+                  </div>
+                  <div v-if="visitDetails.kamar_inap.lama" class="flex justify-between">
+                    <span class="text-gray-600 dark:text-gray-400">Lama:</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ visitDetails.kamar_inap.lama }} hari</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- DIAGNOSA ICD-10 -->
-        <div v-if="visitDetails.diagnosa && visitDetails.diagnosa.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+          <div id="section-diagnosis" v-if="visitDetails && visitDetails.diagnosa && visitDetails.diagnosa.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-red-50 dark:bg-red-900/20 px-6 py-4 rounded-t-xl border-b border-red-200 dark:border-red-800">
             <div class="flex items-center gap-2">
               <UIcon name="i-tabler-stethoscope" class="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -388,7 +683,7 @@
         </div>
 
         <!-- PROSEDUR ICD-9 -->
-        <div v-if="visitDetails.prosedur && visitDetails.prosedur.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div id="section-procedures" v-if="visitDetails && visitDetails.prosedur && visitDetails.prosedur.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 rounded-t-xl border-b border-green-200 dark:border-green-800">
             <div class="flex items-center gap-2">
               <UIcon name="i-tabler-activity-heartbeat" class="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -406,7 +701,7 @@
         </div>
 
         <!-- PEMERIKSAAN RAWAT JALAN (SOAP) DENGAN SNOMED CODING -->
-        <div v-if="visitDetails.cppt_pemeriksaan_ralan && visitDetails.cppt_pemeriksaan_ralan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div id="section-cppt-pemeriksaan-ralan" v-if="visitDetails && visitDetails.cppt_pemeriksaan_ralan && visitDetails.cppt_pemeriksaan_ralan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-blue-50 dark:bg-blue-900/20 px-6 py-4 rounded-t-xl border-b border-blue-200 dark:border-blue-800">
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
@@ -620,14 +915,102 @@
           </div>
         </div>
 
+        <!-- PEMERIKSAAN RAWAT INAP (SOAP) -->
+        <div id="section-pemeriksaan-ranap" v-if="visitDetails && visitDetails.pemeriksaan_ranap" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 rounded-t-xl border-b border-green-200 dark:border-green-800">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-tabler-bed" class="w-5 h-5 text-green-600 dark:text-green-400" />
+                <h4 class="font-semibold text-green-800 dark:text-green-200">Pemeriksaan Rawat Inap (SOAP)</h4>
+              </div>
+              <UBadge
+                v-if="visitDetails.pemeriksaan_ranap && visitDetails.pemeriksaan_ranap.length === 0"
+                label="Data Kosong"
+                color="yellow"
+                size="sm"
+                variant="soft"
+              />
+            </div>
+          </div>
+          <div class="p-6 space-y-4">
+            <div v-for="(soap, index) in visitDetails.pemeriksaan_ranap" :key="`ranap-${index}`" class="border border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50 dark:bg-green-900/10">
+              <div class="flex justify-between items-start mb-3">
+                <div class="flex-1">
+                  <h5 class="font-semibold text-green-800 dark:text-green-200">
+                    {{ soap.tgl_perawatan ? new Date(soap.tgl_perawatan).toLocaleDateString('id-ID') : 'Tanggal tidak tersedia' }}
+                    {{ soap.jam_rawat ? `- ${soap.jam_rawat}` : '' }}
+                  </h5>
+                  <p class="text-sm text-green-700 dark:text-green-300">Dokter: {{ soap.petugas?.nama || soap.petugas?.nm_petugas || soap.nm_dokter || soap.kd_dokter || 'Tidak diketahui' }}</p>
+                </div>
+              </div>
+
+              <!-- SOAP Components -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Subjective -->
+                <div v-if="soap.keluhan" class="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                  <h6 class="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    <UIcon name="i-tabler-message-circle" class="inline w-4 h-4 mr-1" />
+                    Subjective (Keluhan)
+                  </h6>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ soap.keluhan }}</p>
+                </div>
+
+                <!-- Objective -->
+                <div v-if="soap.pemeriksaan" class="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                  <h6 class="font-medium text-yellow-800 dark:text-yellow-200 mb-2">
+                    <UIcon name="i-tabler-search" class="inline w-4 h-4 mr-1" />
+                    Objective (Pemeriksaan)
+                  </h6>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ soap.pemeriksaan }}</p>
+                </div>
+
+                <!-- Assessment -->
+                <div v-if="soap.penilaian" class="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                  <h6 class="font-medium text-orange-800 dark:text-orange-200 mb-2">
+                    <UIcon name="i-tabler-brain" class="inline w-4 h-4 mr-1" />
+                    Assessment (Penilaian)
+                  </h6>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ soap.penilaian }}</p>
+                </div>
+
+                <!-- Plan -->
+                <div v-if="soap.rtl" class="bg-white dark:bg-gray-700 p-3 rounded-lg">
+                  <h6 class="font-medium text-purple-800 dark:text-purple-200 mb-2">
+                    <UIcon name="i-tabler-clipboard-check" class="inline w-4 h-4 mr-1" />
+                    Plan (Rencana Tindak Lanjut)
+                  </h6>
+                  <p class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{{ soap.rtl }}</p>
+                </div>
+              </div>
+
+              <!-- Catatan Dokter -->
+              <div v-if="soap.catatan_dokter" class="mt-4 p-3 bg-gray-100 dark:bg-gray-600 rounded-lg">
+                <h6 class="font-medium text-gray-800 dark:text-gray-200 mb-2">
+                  <UIcon name="i-tabler-notes" class="inline w-4 h-4 mr-1" />
+                  Catatan Penting
+                </h6>
+                <p class="text-sm text-gray-700 dark:text-gray-300">{{ soap.catatan_dokter }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- HASIL LABORATORIUM -->
-        <div v-if="visitDetails.lab && visitDetails.lab.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+              <div id="section-laboratory" v-if="visitDetails && visitDetails.lab && visitDetails.lab.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-yellow-50 dark:bg-yellow-900/20 px-6 py-4 rounded-t-xl border-b border-yellow-200 dark:border-yellow-800">
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
                 <UIcon name="i-tabler-flask" class="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
                 <h4 class="font-semibold text-yellow-800 dark:text-yellow-200">Hasil Laboratorium</h4>
               </div>
+              <UButton
+                icon="i-tabler-history"
+                label="Riwayat Pemeriksaan Lab"
+                color="blue"
+                size="sm"
+                variant="soft"
+                @click="openLabHistoryModal"
+              />
             </div>
           </div>
           <div class="p-6 space-y-4">
@@ -739,81 +1122,187 @@
             </div>
           </div>
         </div>
+        </div>
 
         <!-- RESEP OBAT -->
-        <!-- Resep Obat section now working - debug info removed -->
-
-        <div v-if="resepObat && resepObat.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-          <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 rounded-t-xl border-b border-green-200 dark:border-green-800">
-            <div class="flex justify-between items-center">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-tabler-pills" class="w-5 h-5 text-green-600 dark:text-green-400" />
-                <h4 class="font-semibold text-green-800 dark:text-green-200">Resep Obat</h4>
-                <div class="flex items-center gap-2 ml-4">
-                  <UBadge
-                    :label="`${resepSummary.totalResep} Resep`"
-                    color="green"
-                    variant="soft"
-                    size="xs"
-                  />
-                  <UBadge
-                    :label="`${resepSummary.totalObat} Obat`"
-                    color="blue"
-                    variant="soft"
-                    size="xs"
-                  />
-                  <UBadge
-                    :label="`Rp ${formatCurrency(resepSummary.totalBiaya)}`"
-                    color="purple"
-                    variant="soft"
-                    size="xs"
-                  />
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-500">
-                  Total biaya obat
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="p-6 space-y-4">
-            <div v-for="(resep, index) in resepObat" :key="`resep-${index}`" class="border-b dark:border-gray-700 pb-4 last:border-b-0">
-              <!-- Header Resep -->
-              <div class="flex justify-between items-start mb-4">
-                <div class="flex-1">
-                  <div class="flex items-center gap-2 mb-2">
-                    <h5 class="font-semibold text-gray-900 dark:text-white">No. Resep: {{ resep.no_resep }}</h5>
+         <div class="space-y-6 ml-16 mt-5">
+          <div id="section-medications" v-if="resepObat && !loadingVisitDetails && resepObat.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+            <div class="bg-green-50 dark:bg-green-900/20 px-6 py-4 rounded-t-xl border-b border-green-200 dark:border-green-800">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-tabler-pills" class="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <h4 class="font-semibold text-green-800 dark:text-green-200">Resep Obat</h4>
+                  <div class="flex items-center gap-2 ml-4">
                     <UBadge
-                      :label="resep.status || 'Belum Diberikan'"
-                      :color="resep.status === 'Selesai' ? 'green' : resep.status === 'Diproses' ? 'yellow' : 'gray'"
+                      :label="`${resepSummary.totalResep} Resep`"
+                      color="green"
+                      variant="soft"
+                      size="xs"
+                    />
+                    <UBadge
+                      :label="`${resepSummary.totalObat} Obat`"
+                      color="blue"
+                      variant="soft"
+                      size="xs"
+                    />
+                    <UBadge
+                      :label="`Rp ${formatCurrency(resepSummary.totalBiaya)}`"
+                      color="purple"
                       variant="soft"
                       size="xs"
                     />
                   </div>
-                  <div class="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
-                    <div>
-                      <span class="font-medium">Dokter:</span> {{ resep.dokter?.nama || '-' }}
+                </div>
+                <div class="flex items-center gap-3">
+                  <!-- Statistik Rawat Jalan -->
+                  <div v-if="resepSummary.ralanCount > 0" class="flex items-center gap-1 text-xs">
+                    <UIcon name="i-tabler-user" class="w-4 h-4 text-blue-500" />
+                    <span class="text-gray-600 dark:text-gray-400">{{ resepSummary.ralanCount }} Rawat Jalan</span>
+                  </div>
+                  <!-- Statistik Rawat Inap -->
+                  <div v-if="resepSummary.ranapCount > 0" class="flex items-center gap-1 text-xs">
+                    <UIcon name="i-tabler-bed" class="w-4 h-4 text-green-500" />
+                    <span class="text-gray-600 dark:text-gray-400">{{ resepSummary.ranapCount }} Resep Pulang</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="p-6">
+              <!-- Rawat Jalan - Group by no_resep -->
+              <div v-if="processedResepObat.some(item => item.tipe_rawatan === 'Rawat Jalan')" class="space-y-6">
+                <div class="bg-blue-50 dark:bg-blue-900/10 px-4 py-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h5 class="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <UIcon name="i-tabler-user" class="w-5 h-5 text-blue-500" />
+                    Rawat Jalan
+                    <UBadge
+                      :label="`${processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Jalan').length} Resep`"
+                      color="blue"
+                      variant="soft"
+                      size="xs"
+                      class="ml-2"
+                    />
+                  </h5>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Resep obat untuk pasien rawat jalan yang dikelompokkan berdasarkan nomor resep</p>
+                </div>
+                <div v-for="(resep, index) in processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Jalan').reduce((groups, item) => {
+                  const key = item.no_resep;
+                  if (!groups[key]) groups[key] = [];
+                  groups[key].push(item);
+                  return groups;
+                }, {})" :key="`ralan-${index}`" class="border-b dark:border-gray-700 pb-6 last:border-b-0">
+                  <!-- Header Resep Rawat Jalan -->
+                  <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                      <div class="flex items-center gap-2 mb-2">
+                        <h5 class="font-semibold text-gray-900 dark:text-white">No. Resep: {{ Object.keys(resep)[0] }}</h5>
+                        <UBadge
+                          :label="resep[0].status_resep || 'Belum Diberikan'"
+                          :color="resep[0].status_resep === 'Selesai' ? 'green' : resep[0].status_resep === 'Diproses' ? 'yellow' : 'gray'"
+                          variant="soft"
+                          size="xs"
+                        />
+                      </div>
+                      <div class="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <div>
+                          <span class="font-medium">Dokter:</span> {{ resep[0].dokter_nama || '-' }}
+                        </div>
+                        <div>
+                          <span class="font-medium">Tanggal Peresepan:</span>
+                          {{ resep[0].tgl_peresepan && resep[0].tgl_peresepan !== '0000-00-00' ? new Date(resep[0].tgl_peresepan).toLocaleDateString('id-ID') : 'Tanggal Tidak Tersedia' }}
+                          {{ (resep[0].jam_peresepan && resep[0].tgl_peresepan !== '0000-00-00') ? ' ' + resep[0].jam_peresepan : '' }}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <span class="font-medium">Tanggal Peresepan:</span>
-                      {{ resep.tgl_peresepan ? new Date(resep.tgl_peresepan).toLocaleDateString('id-ID') : new Date(resep.tgl_perawatan).toLocaleDateString('id-ID') }}
-                      {{ resep.jam_peresepan || '' }}
-                    </div>
-                    <div>
-                      <span class="font-medium">Tanggal Penyerahan:</span>
-                      {{ new Date(`${resep.tgl_penyerahan} ${resep.jam_penyerahan}`).toLocaleString('id-ID', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short'
-                      }) }}
-                    </div>
+                  </div>
+                  <!-- Detail Obat Rawat Jalan -->
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                      <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nama Obat</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jumlah</th>
+                          <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Satuan</th>
+                          <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aturan Pakai</th>
+                          <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        <tr v-for="(obat, obatIndex) in resep" :key="`ralan-obat-${obatIndex}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td class="px-3 py-3">
+                            <div>
+                              <div class="font-medium text-gray-900 dark:text-white" :class="{ 'whitespace-pre-wrap': obat.is_racikan }">
+                                {{ obat.display_nama_brng || obat.nama_brng || 'Nama obat tidak diketahui' }}
+                              </div>
+                              <div class="text-xs text-gray-500 dark:text-gray-400">{{ obat.kode_brng }}</div>
+                              <div v-if="obat.kode_sat" class="text-xs text-gray-400">Satuan: {{ obat.kode_sat }}</div>
+                              <div v-if="obat.no_batch" class="text-xs text-gray-400">Batch: {{ obat.no_batch }}</div>
+                            </div>
+                          </td>
+                          <td class="px-3 py-3 text-center">
+                            <span class="font-medium">{{ obat.jml }}</span>
+                          </td>
+                          <td class="px-3 py-3 text-center">
+                            <span class="text-xs">{{ obat.kode_sat || '-' }}</span>
+                          </td>
+                          <td class="px-3 py-3">
+                            <div v-if="obat.aturan_pakai">
+                              <div class="text-xs">{{
+                                typeof obat.aturan_pakai === 'string' ? obat.aturan_pakai :
+                                (obat.aturan_pakai?.aturan || obat.aturan_pakai?.aturan_pakai || '-')
+                              }}</div>
+                              <div v-if="obat.aturan_pakai?.aturan_pakai_desc" class="text-xs text-gray-500 dark:text-gray-400">{{ obat.aturan_pakai.aturan_pakai_desc }}</div>
+                            </div>
+                            <span v-else class="text-xs text-gray-400">-</span>
+                          </td>
+                          <td class="px-3 py-3 text-right">
+                            <div class="font-medium text-gray-900 dark:text-white">
+                              Rp {{ formatCurrency(obat.total) }}
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                      <tfoot class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <td colspan="4" class="px-3 py-3 text-right font-medium">
+                            Total Resep:
+                          </td>
+                          <td class="px-3 py-3 text-right font-bold text-green-600 dark:text-green-400">
+                            Rp {{ formatCurrency(resep.reduce((sum, obat) => sum + (obat.total || 0), 0)) }}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
                   </div>
                 </div>
               </div>
 
-              <!-- Detail Obat -->
-              <div v-if="resep.detail && resep.detail.length > 0" class="space-y-2">
-                <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Detail Obat:</h6>
+              <!-- Visual separator -->
+              <div v-if="processedResepObat.some(item => item.tipe_rawatan === 'Rawat Jalan') && processedResepObat.some(item => item.tipe_rawatan === 'Rawat Inap')" class="my-6">
+                <div class="flex items-center justify-center space-x-2">
+                  <div class="h-px bg-gray-300 dark:bg-gray-600 flex-1"></div>
+                  <div class="text-sm text-gray-500 dark:text-gray-400 px-3 py-1">
+                    <UIcon name="i-tabler-arrow-right" class="w-4 h-4" />
+                  </div>
+                  <div class="h-px bg-gray-300 dark:bg-gray-600 flex-1"></div>
+                </div>
+              </div>
+
+              <!-- Rawat Inap - Resep Pulang -->
+              <div v-if="processedResepObat.some(item => item.tipe_rawatan === 'Rawat Inap')" class="space-y-6 mt-8">
+                <div class="bg-green-50 dark:bg-green-900/10 px-4 py-3 rounded-lg border border-green-200 dark:border-green-800">
+                  <h5 class="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                    <UIcon name="i-tabler-bed" class="w-5 h-5 text-green-500" />
+                    Rawat Inap (Resep Pulang)
+                    <UBadge
+                      :label="`${processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Inap').length} Obat`"
+                      color="green"
+                      variant="soft"
+                      size="xs"
+                      class="ml-2"
+                    />
+                  </h5>
+                  <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Resep obat yang diberikan kepada pasien rawat inap saat pulang</p>
+                </div>
                 <div class="overflow-x-auto">
                   <table class="w-full text-sm">
                     <thead class="bg-gray-50 dark:bg-gray-700">
@@ -821,17 +1310,20 @@
                         <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Nama Obat</th>
                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Jumlah</th>
                         <th class="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Satuan</th>
-                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Aturan Pakai</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dosis</th>
+                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bangsal</th>
                         <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
                     <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      <tr v-for="(obat, obatIndex) in resep.detail" :key="`obat-${obatIndex}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr v-for="(obat, index) in processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Inap')" :key="`ranap-obat-${index}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td class="px-3 py-3">
                           <div>
-                            <div class="font-medium text-gray-900 dark:text-white">{{ obat.obat?.nama_brng || 'Nama obat tidak diketahui' }}</div>
+                            <div class="font-medium text-gray-900 dark:text-white" :class="{ 'whitespace-pre-wrap': obat.is_racikan }">
+                              {{ obat.display_nama_brng || obat.nama_brng || 'Nama obat tidak diketahui' }}
+                            </div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">{{ obat.kode_brng }}</div>
-                            <div v-if="obat.obat?.kode_sat" class="text-xs text-gray-400">Satuan: {{ obat.obat.kode_sat }}</div>
+                            <div v-if="obat.kode_sat" class="text-xs text-gray-400">Satuan: {{ obat.kode_sat }}</div>
                             <div v-if="obat.no_batch" class="text-xs text-gray-400">Batch: {{ obat.no_batch }}</div>
                           </div>
                         </td>
@@ -839,32 +1331,28 @@
                           <span class="font-medium">{{ obat.jml }}</span>
                         </td>
                         <td class="px-3 py-3 text-center">
-                          <span class="text-xs">{{ obat.obat?.kode_sat || '-' }}</span>
+                          <span class="text-xs">{{ obat.kode_sat || '-' }}</span>
                         </td>
                         <td class="px-3 py-3">
-                          <div v-if="obat.aturanPakai">
-                            <div class="text-xs">{{ obat.aturanPakai.aturan_pakai || '-' }}</div>
-                            <div v-if="obat.aturanPakai.aturan_pakai_desc" class="text-xs text-gray-500 dark:text-gray-400">{{ obat.aturanPakai.aturan_pakai_desc }}</div>
-                          </div>
-                          <span v-else class="text-xs text-gray-400">-</span>
+                          <span class="text-xs">{{ obat.dosis || '-' }}</span>
+                        </td>
+                        <td class="px-3 py-3">
+                          <span class="text-xs">{{ obat.nama_bangsal || '-' }}</span>
                         </td>
                         <td class="px-3 py-3 text-right">
                           <div class="font-medium text-gray-900 dark:text-white">
                             Rp {{ formatCurrency(obat.total) }}
-                          </div>
-                          <div v-if="obat.biaya_obat && obat.embalase" class="text-xs text-gray-500">
-                            (Obat: Rp {{ formatCurrency(obat.biaya_obat) }} + Embalase: Rp {{ formatCurrency(obat.embalase) }})
                           </div>
                         </td>
                       </tr>
                     </tbody>
                     <tfoot class="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <td colspan="4" class="px-3 py-3 text-right font-medium">
-                          Total Resep:
+                        <td colspan="5" class="px-3 py-3 text-right font-medium">
+                          Total Resep Pulang:
                         </td>
                         <td class="px-3 py-3 text-right font-bold text-green-600 dark:text-green-400">
-                          Rp {{ formatCurrency(resep.detail.reduce((sum, obat) => sum + (obat.total || 0), 0)) }}
+                          Rp {{ formatCurrency(processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Inap').reduce((sum, obat) => sum + (obat.total || 0), 0)) }}
                         </td>
                       </tr>
                     </tfoot>
@@ -875,8 +1363,11 @@
           </div>
         </div>
 
+        
+
         <!-- TARIF & TINDAKAN -->
-        <div v-if="procedureBilling && procedureBilling.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+         <div id="section-tarif-dan-tindakan" class="space-y-6 ml-16 mt-5">
+                  <div v-if="procedureBilling  && !loadingVisitDetails && procedureBilling.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-purple-50 dark:bg-purple-900/20 px-6 py-4 rounded-t-xl border-b border-purple-200 dark:border-purple-800">
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
@@ -952,23 +1443,23 @@
                       variant="soft"
                     />
                     <UBadge
-                      :label="row.jenis_petugas"
+                      :label="row.nama_petugas || row.jenis_petugas"
                       color="gray"
                       size="2xs"
                       variant="soft"
                     />
                   </div>
                   <!-- SNOMED Mapping Display -->
-                  <div v-if="row.snomed_mapping && row.snomed_mapping.has_mapping" class="mt-2">
+                  <div v-if="hasSnomedMapping(row)" class="mt-2">
                     <div class="bg-purple-50 dark:bg-purple-900/20 rounded p-2 border border-purple-200 dark:border-purple-800">
                       <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                           <UIcon name="i-tabler-code" class="w-3 h-3 text-purple-600 dark:text-purple-400" />
                           <span class="text-xs text-purple-700 dark:text-purple-300 font-mono">
-                            {{ row.snomed_mapping.snomed.code }}
+                            {{ getSnomedCode(row) }}
                           </span>
                           <span class="text-xs text-purple-600 dark:text-purple-400">
-                            {{ row.snomed_mapping.snomed.display }}
+                            {{ getSnomedDisplay(row) }}
                           </span>
                         </div>
                         <UButton
@@ -982,7 +1473,7 @@
                     </div>
                   </div>
                   <!-- Mapping Status (No Mapping) -->
-                  <div v-else-if="row.kd_jenis_prw && !row.snomed_mapping?.has_mapping" class="mt-2">
+                  <div v-else-if="row.kd_jenis_prw && !hasSnomedMapping(row)" class="mt-2">
                     <div class="bg-amber-50 dark:bg-amber-900/20 rounded p-2 border border-amber-200 dark:border-amber-800">
                       <div class="flex items-center gap-2">
                         <UIcon name="i-tabler-alert-triangle" class="w-3 h-3 text-amber-600 dark:text-amber-400" />
@@ -1010,20 +1501,12 @@
 
               <template #waktu-data="{ row }">
                 <div class="text-sm text-gray-600 dark:text-gray-400">
-                  <p>{{ formatDate(row.tgl_perawatan) }}</p>
-                  <p class="text-xs">{{ row.jam_rawat }}</p>
+                  <p>{{ formatDate(row.waktu?.tgl_perawatan || row.tgl_perawatan) }}</p>
+                  <p class="text-xs">{{ row.waktu?.jam_rawat || row.jam_rawat }}</p>
                 </div>
               </template>
 
-              <template #stts_bayar-data="{ row }">
-                <UBadge
-                  :label="row.stts_bayar || 'Belum'"
-                  :color="row.stts_bayar === 'Sudah' ? 'green' : 'yellow'"
-                  size="2xs"
-                  variant="soft"
-                />
-              </template>
-            </UTable>
+                          </UTable>
 
             <!-- Top Procedures -->
             <div v-if="topProcedures && topProcedures.length > 0" class="mt-6">
@@ -1046,22 +1529,188 @@
             </div>
           </div>
         </div>
-
-        <!-- RADIOLOGI -->
-        <div v-if="visitDetails.radiologi" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
-          <div class="bg-indigo-50 dark:bg-indigo-900/20 px-6 py-4 rounded-t-xl border-b border-indigo-200 dark:border-indigo-800">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-tabler-radioactive" class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <h4 class="font-semibold text-indigo-800 dark:text-indigo-200">Hasil Radiologi</h4>
-            </div>
-          </div>
-          <div class="p-6">
-            <pre class="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">{{ visitDetails.radiologi }}</pre>
-          </div>
         </div>
 
+        
+
+        <!-- RADIOLOGI -->
+         <div class="space-y-6 ml-16 mt-5">
+                <div v-if="visitDetails  && !loadingVisitDetails && visitDetails.radiologi" class="bg-gradient-to-br from-white via-blue-50/20 to-cyan-50/10 dark:from-gray-800 dark:via-blue-900/10 dark:to-cyan-900/10 rounded-2xl shadow-lg border border-blue-200/50 dark:border-blue-700/50 overflow-hidden backdrop-blur-sm">
+          <!-- Header -->
+          <div class="bg-gradient-to-r from-blue-600 to-cyan-600 dark:from-blue-800 dark:to-cyan-900 px-6 py-4 relative overflow-hidden">
+            <div class="relative z-10 flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <UIcon name="i-tabler-file-text" class="w-5 h-5 text-white" />
+                <div>
+                  <h4 class="font-bold text-white text-base">Hasil Pemeriksaan Radiologi</h4>
+                  <p class="text-blue-100 text-xs">Laporan Hasil Bacaan</p>
+                </div>
+              </div>
+              <div class="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full border border-white/30">
+                <span class="text-white text-xs font-medium">Selesai</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Main content -->
+          <div class="pl-6 pr-6 pt-6 space-y-0">
+            <!-- Pemeriksaan Info -->
+            <div class="bg-gradient-to-r from-cyan-50 to-teal-50 dark:from-cyan-900/20 dark:to-teal-900/20 rounded-lg p-3 border border-cyan-100 dark:border-cyan-700/30">
+                <div class="flex items-center gap-2 mb-2">
+                  <UIcon name="i-tabler-scan" class="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                  <span class="text-xs font-semibold text-cyan-700 dark:text-cyan-300 uppercase tracking-wider">Pemeriksaan</span>
+                </div>
+                <div class="space-y-1">
+                  <p class="text-sm font-bold text-gray-800 dark:text-gray-100">
+                    {{ Array.isArray(visitDetails.radiologi) && visitDetails.radiologi[0]?.jenis_perawatan?.nm_perawatan ? visitDetails.radiologi[0].jenis_perawatan.nm_perawatan : 'Thorax AP/PA' }}
+                  </p>
+                  <p class="text-xs text-gray-600 dark:text-gray-400">
+                    {{ Array.isArray(visitDetails.radiologi) && visitDetails.radiologi[0]?.tgl_periksa ? formatDate(visitDetails.radiologi[0].tgl_periksa) : formatDate(visitDetails.tgl_kunjungan) }}
+                  </p>
+                  <p class="text-xs text-gray-600 dark:text-gray-400">
+                    {{ Array.isArray(visitDetails.radiologi) && visitDetails.radiologi[0]?.jam ? `Pukul ${visitDetails.radiologi[0].jam}` : '' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-6 space-y-1">
+            <!-- Hasil Bacaaan Section -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 p-3 dark:border-gray-700">
+              <div class="px-6 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div class="flex items-center gap-2 md:col-start">
+                    <UIcon name="i-tabler-microscope" class="w-4 text-gray-600 dark:text-gray-400" />
+                    <h5 class="font-semibold text-gray-800 dark:text-gray-100 text-sm">Hasil Bacaan</h5>
+                  </div>
+                </div>
+              </div>
+              </div>
+
+
+
+              <div class="pt-4">
+                <div v-if="visitDetails && visitDetails.radiologi" class="space-y-4">
+                  <!-- Hasil Bacaan -->
+                  <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                    <div v-for="(line, index) in getRadiologyText(visitDetails.radiologi)" :key="index"
+                           class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {{ line }}
+                    </div>
+                  </div>
+
+                  <!-- Tabel Perbandingan Gambar -->
+                  <div class="mt-6 bg-gray-50 dark:bg-gray-900/20 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                    <div class="flex items-center gap-3 mb-4">
+                      <UIcon name="i-tabler-photo" class="w-6 h-6 text-teal-600 dark:text-teal-400" />
+                      <h5 class="font-semibold text-gray-800 dark:text-gray-100 text-lg">Gambar Radiologi</h5>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                      <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                        <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                          <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Tanggal</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Jam</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Gambar</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wider">Petugas</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="(item, index) in visitDetails.radiologi" :key="index"
+                              class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                              {{ formatDate(item.tgl_periksa) }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                              {{ item.jam }}
+                            </td>
+                            <td class="px-4 py-3 text-sm">
+                              <div v-if="item.gambarRadiologi && item.gambarRadiologi.length > 0">
+                                <div v-for="(gambar, gambarIndex) in item.gambarRadiologi" :key="gambarIndex"
+                                     class="mb-3 p-2 bg-gray-100 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                                  <div class="flex items-center gap-3">
+                                    <!-- Gambar dengan fitur preview -->
+                                    <div class="flex-shrink-0">
+                                      <div class="relative inline-block w-16 h-16">
+                                        <img :src="gambar.lokasi_gambar"
+                                             :alt="gambar.deskripsi || 'Gambar Radiologi'"
+                                             @click="openImagePreview(gambar.lokasi_gambar, gambar.deskripsi || 'Gambar Radiologi')"
+                                             class="w-full h-full object-contain rounded-lg border border-gray-300 dark:border-gray-600 shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200 bg-gray-50 dark:bg-gray-800"
+                                             @load="handleImageLoad">
+                                        <!-- Optional: Show loading state -->
+                                        <div v-if="gambar.loading"
+                                             class="absolute inset-0 flex items-center justify-center bg-white/80 dark:bg-gray-700/80 rounded-lg border border-gray-300 dark:border-gray-600">
+                                          <div class="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <!-- Informasi Gambar -->
+                                    <div class="flex-1 min-w-0">
+                                      <p class="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{{ gambar.deskripsi || 'Gambar Radiologi' }}</p>
+                                      <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">Klik gambar untuk preview</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              <div v-else class="text-sm text-gray-500 dark:text-gray-400">
+                                Tidak ada gambar untuk pemeriksaan ini
+                              </div>
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                              {{ item.jenis_perawatan?.nm_perawatan || '-' }}
+                            </td>
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100">
+                              <div v-if="item.dokter_perujuk" class="flex items-center gap-2">
+                                <UIcon name="i-tabler-user" class="w-4 h-4 text-blue-500 dark:text-blue-400" />
+                                <div>
+                                  <p class="text-sm font-medium">{{ item.dokter_perujuk }}</p>
+                                  <p class="text-xs text-gray-600 dark:text-gray-400">Dokter Perujuk</p>
+                                </div>
+                              </div>
+                              <div v-else class="text-gray-500 dark:text-gray-400">
+                                -
+                              </div>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Default display if no data -->
+                <div v-else class="text-center py-8">
+                  <UIcon name="i-tabler-file-x" class="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p class="text-sm text-gray-500 dark:text-gray-400">Belum ada hasil pemeriksaan radiologi</p>
+                  <!-- Debug: show available data -->
+                  <div class="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-600">
+                    <p class="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">DEBUG - Data yang tersedia:</p>
+                    <pre class="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-2 rounded overflow-x-auto">{{ JSON.stringify(visitDetails, null, 2) }}</pre>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="p-6 space-y-3">
+            <!-- Footer -->
+            <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                <UIcon name="i-tabler-info-circle" class="w-3 h-3" />
+                <span>Hasil pemeriksaan telah direview</span>
+              </div>
+              <span class="text-xs text-gray-500 dark:text-gray-400">Report ID: {{ visitDetails.no_rawat || 'N/A' }}</span>
+            </div>
+          </div>
+          </div>
+          </div>
+
+
+        
+        
+
         <!-- CATATAN TAMBAHAN -->
-        <div v-if="visitDetails.cppt_catatan && visitDetails.cppt_catatan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div v-if="visitDetails && visitDetails.cppt_catatan && visitDetails.cppt_catatan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
           <div class="bg-gray-50 dark:bg-gray-900/20 px-6 py-4 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
               <UIcon name="i-tabler-note" class="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -1213,22 +1862,10 @@
           </div>
         </div>
 
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="!loadingVisitDetails && !visitDetails" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-6">
-        <div class="flex items-center gap-4">
-          <UIcon name="i-tabler-alert-circle" class="w-8 h-8 text-red-500" />
-          <div>
-            <h3 class="font-semibold text-red-800 dark:text-red-200">Gagal Memuat Detail</h3>
-            <p class="text-red-600 dark:text-red-300 text-sm">Terjadi kesalahan saat memuat detail pemeriksaan. Silakan coba lagi.</p>
-          </div>
-        </div>
-      </div>
-
       <!-- ========================================= -->
       <!-- BUNDLE RM DISPLAY SECTION                 -->
       <!-- ========================================= -->
+       <div class="space-y-6 ml-16 mt-5">
       <div v-if="selectedVisitData && !loadingVisitDetails && visitDetails" class="mt-8">
         <UCard>
           <template #header>
@@ -1249,6 +1886,15 @@
                   size="sm"
                   @click="generateAndShowBundle"
                   :loading="loadingBundle"
+                />
+                <UButton
+                  icon="i-tabler-download"
+                  label="Download JSON"
+                  color="green"
+                  variant="soft"
+                  size="sm"
+                  @click="downloadBundleAsJson"
+                  :disabled="!currentBundle"
                 />
                 <UButton
                   icon="i-tabler-copy"
@@ -1323,7 +1969,7 @@
           </div>
         </UCard>
       </div>
-    </div>
+      </div>
 
     <!-- FLOATING BPJS SUBMISSION BUTTON -->
     <div v-if="selectedVisitData && !loadingVisitDetails" class="fixed bottom-6 right-6 z-50">
@@ -1348,28 +1994,31 @@
           <div class="absolute -bottom-2 right-4 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900"></div>
         </div>
 
-        <!-- Main Button -->
-        <UButton
-          icon="i-tabler-send"
-          label="Kirim ke BPJS"
-          color="green"
-          size="lg"
-          :loading="sendingToBpjs"
-          @click="sendToBpjs"
-          class="shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-          :ui="{
-            base: 'relative overflow-hidden rounded-xl font-semibold',
-            color: {
-              green: {
-                solid: 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white dark:from-green-600 dark:to-emerald-600 dark:hover:from-green-700 dark:hover:to-emerald-700',
+        <!-- Buttons Container -->
+        <div class="flex gap-3">
+          <!-- Main Button -->
+          <UButton
+            icon="i-tabler-send"
+            label="Kirim ke BPJS"
+            color="green"
+            size="lg"
+            :loading="sendingToBpjs"
+            @click="sendToBpjs"
+            class="shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+            :ui="{
+              base: 'relative overflow-hidden rounded-xl font-semibold',
+              color: {
+                green: {
+                  solid: 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white dark:from-green-600 dark:to-emerald-600 dark:hover:from-green-700 dark:hover:to-emerald-700',
+                }
               }
-            }
-          }"
-        >
+            }"
+          >
           <template #trailing>
             <UIcon v-if="!sendingToBpjs" name="i-tabler-rocket" class="w-4 h-4 animate-pulse" />
           </template>
         </UButton>
+        </div>
 
         <!-- Success/Error Indicator -->
         <div v-if="bpjsSubmissionStatus" class="absolute -top-2 -right-2 w-4 h-4 rounded-full border-2 border-white dark:border-gray-900"
@@ -1852,14 +2501,364 @@
       </UCard>
     </UModal>
 
-    <template #footer>
-      <small>Data diambil dari server SIMRS</small>
-    </template>
-  </UCard>
+    <!-- ========================================= -->
+    <!-- MODAL: RIWAYAT LABORATORIUM           -->
+    <!-- ========================================= -->
+    <UModal v-model="showLabHistoryModal" :ui="{ width: 'sm:max-w-7xl', height: 'h-screen', fullscreen: 'sm:h-full' }">
+      <UCard class="overflow-y-auto max-h-screen">
+        <template #header>
+          <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center gap-3">
+              <div class="flex items-center justify-center w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <UIcon name="i-tabler-flask" class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  Riwayat Pemeriksaan Laboratorium
+                </h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                  {{ selectedVisitData?.nama_pasien || 'Pasien' }} •
+                  {{ selectedVisitData?.no_rkm_medis || selectedVisitData?.nomr || '-' }}
+                </p>
+              </div>
+            </div>
+            <UButton
+              color="gray"
+              variant="ghost"
+              size="sm"
+              icon="i-tabler-x"
+              @click="showLabHistoryModal = false"
+            />
+          </div>
+        </template>
+
+        <div class="p-6">
+          <!-- Filter Section -->
+          <div class="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-900 rounded-xl border border-blue-100 dark:border-gray-700">
+            <div class="flex items-center gap-2 mb-4">
+              <UIcon name="i-tabler-filter" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h4 class="font-medium text-gray-900 dark:text-white">Filter Pemeriksaan</h4>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <UIcon name="i-tabler-calendar-event" class="w-4 h-4 inline mr-1" />
+                  Tanggal Dari
+                </label>
+                <UInput
+                  v-model="labHistoryFilters.tanggalDari"
+                  type="date"
+                  placeholder="Pilih tanggal mulai"
+                  :disabled="loadingLabHistory"
+                  size="sm"
+                  icon="i-tabler-calendar"
+                />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <UIcon name="i-tabler-calendar-off" class="w-4 h-4 inline mr-1" />
+                  Tanggal Sampai
+                </label>
+                <UInput
+                  v-model="labHistoryFilters.tanggalSampai"
+                  type="date"
+                  placeholder="Pilih tanggal akhir"
+                  :disabled="loadingLabHistory"
+                  size="sm"
+                  icon="i-tabler-calendar"
+                />
+              </div>
+              <div class="flex items-end gap-2">
+                <UButton
+                  icon="i-tabler-search"
+                  label="Cari"
+                  color="blue"
+                  :loading="loadingLabHistory"
+                  @click="searchLabHistory"
+                  size="sm"
+                  class="px-4"
+                />
+                <UButton
+                  icon="i-tabler-refresh"
+                  variant="outline"
+                  color="gray"
+                  :loading="loadingLabHistory"
+                  @click="() => { labHistoryFilters.tanggalDari = ''; labHistoryFilters.tanggalSampai = ''; searchLabHistory(); }"
+                  size="sm"
+                />
+              </div>
+              <div class="flex items-end">
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                  <UIcon name="i-tabler-info-circle" class="w-4 h-4 inline mr-1" />
+                  {{ labHistoryPagination.totalRecords || 0 }} hasil ditemukan
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading State -->
+          <div v-if="loadingLabHistory" class="text-center py-12">
+            <div class="flex flex-col items-center">
+              <UIcon name="i-tabler-loader-2" class="w-10 h-10 text-blue-600 animate-spin mb-4" />
+              <p class="text-gray-600 dark:text-gray-400 font-medium">Mengambil data riwayat laboratorium...</p>
+              <p class="text-sm text-gray-500 dark:text-gray-500 mt-1">Mohon tunggu sebentar</p>
+            </div>
+          </div>
+
+          <!-- Lab History Data -->
+          <div v-else-if="labHistoryData.length > 0" class="space-y-6">
+            <div v-for="(labItem, index) in labHistoryData" :key="`history-${index}`"
+                 class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200">
+
+              <!-- Card Header -->
+              <div class="p-4 border-b border-gray-100 dark:border-gray-700">
+                <div class="flex items-start justify-between">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                      <div class="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                        <UIcon name="i-tabler-microscope" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <h4 class="font-semibold text-gray-900 dark:text-white text-base">
+                        {{ labItem.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Laboratorium' }}
+                      </h4>
+                    </div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <UBadge
+                        :label="labItem.status === 'Ranap' ? 'Rawat Inap' : labItem.status === 'Ralan' ? 'Rawat Jalan' : (labItem.status || 'Ralan')"
+                        :color="labItem.status === 'Ranap' ? 'green' : 'blue'"
+                        size="xs"
+                        variant="soft"
+                      />
+                      <UBadge
+                        :label="labItem.kategori || 'PK'"
+                        color="gray"
+                        size="xs"
+                        variant="soft"
+                      />
+                      <span class="text-xs text-gray-500 dark:text-gray-400">
+                        No. Rawat: {{ labItem.no_rawat || '-' }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="text-right ml-4">
+                    <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                      Rp {{ formatCurrency(labItem.biaya || 0) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {{ new Date(`${labItem.tgl_periksa} ${labItem.jam}`).toLocaleString('id-ID', {
+                        dateStyle: 'medium',
+                        timeStyle: 'short'
+                      }) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Card Body -->
+              <div class="p-4">
+                <!-- Medical Staff Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4 text-sm">
+                  <div v-if="labItem.dokter" class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <UIcon name="i-tabler-user" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Dokter</div>
+                      <div class="font-medium text-gray-900 dark:text-white">{{ labItem.dokter.nm_dokter }}</div>
+                    </div>
+                  </div>
+                  <div v-if="labItem.dokter_perujuk" class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <UIcon name="i-tabler-user-check" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Dokter Perujuk</div>
+                      <div class="font-medium text-gray-900 dark:text-white">{{ labItem.dokter_perujuk.nm_dokter || labItem.dokter_perujuk }}</div>
+                    </div>
+                  </div>
+                  <div v-if="labItem.registrasi?.poliklinik || labItem.poliklinik" class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <UIcon name="i-tabler-building-hospital" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Poli</div>
+                      <div class="font-medium text-gray-900 dark:text-white">{{ labItem.registrasi?.poliklinik?.nm_poli || labItem.poliklinik?.nm_poli || '-' }}</div>
+                    </div>
+                  </div>
+                  <div v-if="labItem.petugas" class="flex items-center gap-2 p-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                    <UIcon name="i-tabler-clipboard" class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <div>
+                      <div class="text-xs text-gray-500 dark:text-gray-400">Petugas</div>
+                      <div class="font-medium text-gray-900 dark:text-white">{{ labItem.petugas.nama || labItem.petugas }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Lab Results -->
+                <div v-if="labItem.detail_periksa_lab && labItem.detail_periksa_lab.length > 0">
+                  <div class="border-t border-gray-100 dark:border-gray-700 pt-4">
+                    <div class="flex items-center gap-2 mb-3">
+                      <UIcon name="i-tabler-chart-dots" class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <h5 class="font-medium text-gray-900 dark:text-white">Hasil Pemeriksaan</h5>
+                      <UBadge
+                        :label="`${labItem.detail_periksa_lab.length} parameter`"
+                        color="blue"
+                        size="xs"
+                        variant="soft"
+                      />
+                    </div>
+
+                  <!-- Check if this is a grouped test (like Darah Lengkap) or individual parameters -->
+                  <div v-if="isGroupedLabTest(labItem.detail_periksa_lab)" class="space-y-4">
+                    <!-- Show main test info once -->
+                    <div class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
+                      <h4 class="font-semibold text-base text-gray-900 dark:text-white mb-2">
+                        {{ labItem.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Laboratorium' }}
+                      </h4>
+                      <div class="text-sm text-gray-600 dark:text-gray-400">
+                        Total {{ labItem.detail_periksa_lab.length }} parameter
+                      </div>
+                    </div>
+
+                    <!-- Individual parameter cards -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div v-for="detail in labItem.detail_periksa_lab" :key="detail.id_template || detail.no_detail || detail.id"
+                           class="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-shadow">
+                        <div class="flex justify-between items-start gap-3">
+                          <div class="flex-1 min-w-0">
+                            <h5 class="font-semibold text-sm text-gray-900 dark:text-white mb-1 truncate">
+                              {{ getParameterName(detail) }}
+                            </h5>
+                            <div v-if="detail.keterangan || detail.catatan" class="text-xs text-gray-500 dark:text-gray-400">
+                              {{ detail.keterangan || detail.catatan }}
+                            </div>
+                          </div>
+                          <div class="text-right flex-shrink-0">
+                            <div class="flex items-center gap-1 mb-1">
+                              <span :class="[getResultSizeClass(), getResultColorClass(detail)]">{{ detail.nilai || '-' }}</span>
+                              <span v-if="detail.satuan || detail.template?.satuan" class="text-xs text-gray-500 dark:text-gray-400">{{ detail.satuan || detail.template?.satuan }}</span>
+                            </div>
+                            <div v-if="detail.nilai_rujukan || detail.batas_bawah || detail.batas_atas" class="text-xs text-gray-500 dark:text-gray-400">
+                              <span class="text-gray-400">Ref:</span>
+                              {{ detail.nilai_rujukan || `${detail.batas_bawah || '-'} - ${detail.batas_atas || '-'}` }}
+                            </div>
+                            <!-- Status indicators -->
+                            <div v-if="getParameterStatus(detail)" class="mt-1">
+                              <UBadge
+                                :label="getParameterStatus(detail)"
+                                :color="getParameterStatusColor(detail)"
+                                size="2xs"
+                                variant="soft"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Single test display (not grouped) -->
+                  <div v-else class="space-y-3">
+                    <div v-for="detail in labItem.detail_periksa_lab" :key="detail.id_template || detail.no_detail || detail.id"
+                         class="p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-900/50 dark:to-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div class="flex justify-between items-start gap-4">
+                        <div class="flex-1 min-w-0">
+                          <h4 class="font-semibold text-base text-gray-900 dark:text-white mb-1">
+                            {{ getParameterName(detail) }}
+                          </h4>
+                          <div v-if="detail.keterangan || detail.catatan" class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                            {{ detail.keterangan || detail.catatan }}
+                          </div>
+                        </div>
+                        <div class="flex flex-col items-end gap-1 text-right min-w-fit">
+                          <div class="flex items-center gap-2">
+                            <span :class="[getResultSizeClass(true), getResultColorClass(detail)]">{{ detail.nilai }}</span>
+                            <span v-if="detail.satuan || detail.template?.satuan" class="text-sm text-gray-600 dark:text-gray-400">{{ detail.satuan || detail.template?.satuan }}</span>
+                          </div>
+                          <div v-if="detail.nilai_rujukan || detail.batas_bawah || detail.batas_atas" class="text-xs text-gray-500 dark:text-gray-400">
+                            <span class="text-gray-400">Ref:</span>
+                            {{ detail.nilai_rujukan || `${detail.batas_bawah || '-'} - ${detail.batas_atas || '-'}` }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  </div>
+                </div>
+                <div v-else class="border-t border-gray-100 dark:border-gray-700 pt-4">
+                  <div class="text-center py-3">
+                    <UIcon name="i-tabler-dots" class="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Detail hasil pemeriksaan tidak tersedia</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div v-else class="text-center py-12">
+            <div class="flex flex-col items-center">
+              <div class="flex items-center justify-center w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+                <UIcon name="i-tabler-flask-off" class="w-8 h-8 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Tidak Ada Riwayat Pemeriksaan
+              </h3>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
+                Belum ada riwayat pemeriksaan laboratorium untuk pasien ini pada periode yang dipilih.
+              </p>
+              <UButton
+                icon="i-tabler-refresh"
+                label="Coba Lagi"
+                color="blue"
+                variant="soft"
+                @click="searchLabHistory"
+                size="sm"
+              />
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="labHistoryPagination.totalPages > 1" class="flex items-center justify-between mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              Menampilkan {{ ((labHistoryPagination.currentPage - 1) * labHistoryPagination.perPage) + 1 }} -
+              {{ Math.min(labHistoryPagination.currentPage * labHistoryPagination.perPage, labHistoryPagination.totalRecords) }}
+              dari {{ labHistoryPagination.totalRecords }} hasil
+            </div>
+            <div class="flex items-center gap-2">
+              <UButton
+                icon="i-tabler-chevron-left"
+                size="sm"
+                color="gray"
+                variant="outline"
+                :disabled="!labHistoryPagination.hasPrevPage || loadingLabHistory"
+                @click="previousLabHistoryPage"
+              >
+                Sebelumnya
+              </UButton>
+              <div class="flex items-center gap-1">
+                <span class="text-sm font-medium text-gray-900 dark:text-white px-3 py-1 bg-blue-100 dark:bg-blue-900/30 rounded">
+                  {{ labHistoryPagination.currentPage }}
+                </span>
+                <span class="text-sm text-gray-500 dark:text-gray-400">dari {{ labHistoryPagination.totalPages }}</span>
+              </div>
+              <UButton
+                icon="i-tabler-chevron-right"
+                size="sm"
+                color="gray"
+                variant="outline"
+                :disabled="!labHistoryPagination.hasNextPage || loadingLabHistory"
+                @click="nextLabHistoryPage"
+              >
+                Berikutnya
+              </UButton>
+            </div>
+          </div>
+        </div>
+        <!-- Add bottom padding to prevent cutoff -->
+        <div class="h-8"></div>
+      </UCard>
+    </UModal>
+
+    </UCard>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useClipboard } from '@vueuse/core'
 
@@ -1889,23 +2888,155 @@ const tokenStore = useAccessTokenStore()
 const toast = useToast()
 const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
 
+// ERM BPJS Status composable
+const { checkErmBpjsStatus, checkMultipleErmStatus, isLoading, clearCache } = useErmBpjsStatus()
+
+// Manual refresh function for single SEP
+const refreshErmStatus = async (noSep: string) => {
+  if (!noSep) return
+
+  console.log('🔄 Manual refresh ERM BPJS status for SEP:', noSep)
+
+  // Clear cache for specific SEP
+  clearCache(noSep)
+
+  // Check status again
+  try {
+    const status = await checkErmBpjsStatus(noSep)
+    ermBpjsStatus.value[noSep] = status
+
+    // Update reactive state
+    ermBpjsStatus.value = { ...ermBpjsStatus.value }
+
+    console.log(`✅ Manual refresh result for ${noSep}:`, status)
+
+    // Show toast
+    toast.add({
+      icon: status ? 'i-tabler-check' : 'i-tabler-x',
+      title: status ? 'ERM BPJS Status: Terkirim' : 'ERM BPJS Status: Belum Terkirim',
+      description: `Status untuk SEP ${noSep} telah diperbarui`,
+      color: status ? 'green' : 'orange',
+      timeout: 3000
+    })
+  } catch (error) {
+    console.error('❌ Failed to refresh ERM status:', error)
+    toast.add({
+      icon: 'i-tabler-alert-triangle',
+      title: 'Error',
+      description: 'Gagal memperbarui status ERM BPJS',
+      color: 'red',
+      timeout: 3000
+    })
+  }
+}
+
+// Refresh all ERM status function
+const refreshAllErmStatus = async () => {
+  console.log('🔄 Refreshing all ERM BPJS status...')
+
+  if (!props.data?.data || !Array.isArray(props.data.data)) {
+    toast.add({
+      icon: 'i-tabler-alert-triangle',
+      title: 'No Data',
+      description: 'Tidak ada data SEP untuk di-refresh',
+      color: 'orange',
+      timeout: 3000
+    })
+    return
+  }
+
+  // Get all SEPs
+  const sepList = props.data.data
+    .map((row: any) => row.no_sep)
+    .filter(Boolean)
+
+  if (sepList.length === 0) {
+    toast.add({
+      icon: 'i-tabler-alert-triangle',
+      title: 'No SEP Found',
+      description: 'Tidak ada SEP yang valid untuk di-refresh',
+      color: 'orange',
+      timeout: 3000
+    })
+    return
+  }
+
+  // Clear all cache
+  sepList.forEach(sep => clearCache(sep))
+
+  // Check all status
+  try {
+    const results = await checkMultipleErmStatus(sepList)
+    const newStatus: Record<string, boolean> = {}
+    results.forEach((status, noSep) => {
+      newStatus[noSep] = status
+    })
+
+    ermBpjsStatus.value = { ...ermBpjsStatus.value, ...newStatus }
+
+    const successCount = Object.values(newStatus).filter(Boolean).length
+    console.log('✅ Refresh all ERM BPJS status results:', newStatus)
+
+    toast.add({
+      icon: 'i-tabler-refresh',
+      title: 'Status Refreshed',
+      description: `${successCount}/${sepList.length} SEP memiliki status ERM BPJS`,
+      color: successCount > 0 ? 'green' : 'blue',
+      timeout: 3000
+    })
+  } catch (error) {
+    console.error('❌ Failed to refresh all ERM status:', error)
+    toast.add({
+      icon: 'i-tabler-alert-triangle',
+      title: 'Error',
+      description: 'Gagal memperbarui semua status ERM BPJS',
+      color: 'red',
+      timeout: 3000
+    })
+  }
+}
+
+// Reactive untuk menyimpan status ERM BPJS per SEP
+const ermBpjsStatus = ref<Record<string, boolean>>({})
+
+// Watch untuk changes in data dan check ERM status
+watch(() => props.data, async (newData) => {
+  if (newData?.data && Array.isArray(newData.data)) {
+    const sepList = newData.data
+      .map((row: any) => row.no_sep)
+      .filter(Boolean) // Remove null/undefined
+
+    if (sepList.length > 0) {
+      const results = await checkMultipleErmStatus(sepList)
+      const newStatus: Record<string, boolean> = {}
+      results.forEach((status, noSep) => {
+        newStatus[noSep] = status
+      })
+      ermBpjsStatus.value = { ...newStatus }
+    }
+  }
+}, { immediate: true, deep: true })
+
 // Enhanced Toast Functions dengan posisi tengah dan styling menarik
 const showSuccessToast = (title: string, description?: string, options?: any) => {
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800 dark:to-green-900/30 shadow-2xl rounded-2xl border border-green-200 dark:border-green-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-green-50 to-emerald-50 dark:from-gray-800 dark:to-green-900/30 shadow-2xl rounded-2xl border border-green-200 dark:border-green-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] max-w-md mx-4 animate-bounce-in'
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse-once">
-        <i class="i-tabler-circle-check text-white text-xl"></i>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-400 to-emerald-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse-once mx-auto sm:mx-0">
+        <i class="i-tabler-circle-check text-white text-lg sm:text-xl"></i>
       </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-lg font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">${title}</h4>
+        ${description ? `<p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium break-words">${description}</p>` : ''}
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -1926,18 +3057,21 @@ const showErrorToast = (title: string, description?: string, options?: any) => {
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 to-pink-50 dark:from-gray-800 dark:to-red-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-shake-once'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 to-pink-50 dark:from-gray-800 dark:to-red-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] max-w-md mx-4 animate-shake-once'
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <i class="i-tabler-alert-circle text-white text-xl"></i>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-400 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse mx-auto sm:mx-0">
+        <i class="i-tabler-alert-circle text-white text-lg sm:text-xl"></i>
       </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-lg font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent">${title}</h4>
+        ${description ? `<p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium break-words">${description}</p>` : ''}
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -1958,18 +3092,21 @@ const showInfoToast = (title: string, description?: string, options?: any) => {
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-blue-900/30 shadow-2xl rounded-2xl border border-blue-200 dark:border-blue-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-gray-800 dark:to-blue-900/30 shadow-2xl rounded-2xl border border-blue-200 dark:border-blue-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] max-w-md mx-4 animate-bounce-in'
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-spin-slow">
-        <i class="i-tabler-info-circle text-white text-xl"></i>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-spin-slow mx-auto sm:mx-0">
+        <i class="i-tabler-info-circle text-white text-lg sm:text-xl"></i>
       </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-lg font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">${title}</h4>
+        ${description ? `<p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium break-words">${description}</p>` : ''}
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -1989,18 +3126,21 @@ const showWarningToast = (title: string, description?: string, options?: any) =>
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-800 dark:to-orange-900/30 shadow-2xl rounded-2xl border border-orange-200 dark:border-orange-700 backdrop-blur-md p-6 min-w-[350px] max-w-md animate-bounce-in'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-orange-50 to-amber-50 dark:from-gray-800 dark:to-orange-900/30 shadow-2xl rounded-2xl border border-orange-200 dark:border-orange-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] max-w-md mx-4 animate-bounce-in'
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-bounce">
-        <i class="i-tabler-alert-triangle text-white text-xl"></i>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-bounce mx-auto sm:mx-0">
+        <i class="i-tabler-alert-triangle text-white text-lg sm:text-xl"></i>
       </div>
-      <div class="flex-1">
-        <h4 class="text-lg font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">${title}</h4>
-        ${description ? `<p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>` : ''}
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-lg font-bold bg-gradient-to-r from-orange-600 to-amber-600 bg-clip-text text-transparent">${title}</h4>
+        ${description ? `<p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium break-words">${description}</p>` : ''}
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -2020,21 +3160,30 @@ const showBpjsSuccessToast = (description: string) => {
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-gray-800 dark:via-green-900/30 dark:to-teal-900/30 shadow-2xl rounded-2xl border border-emerald-200 dark:border-emerald-700 backdrop-blur-md p-6 min-w-[400px] max-w-md animate-bounce-in'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 dark:from-gray-800 dark:via-green-900/30 dark:to-teal-900/30 shadow-2xl rounded-2xl border border-emerald-200 dark:border-emerald-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] max-w-md mx-4 animate-bounce-in'
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-14 h-14 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <span class="text-white text-2xl">🎉</span>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-emerald-500 via-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse mx-auto sm:mx-0">
+        <span class="text-white text-lg sm:text-2xl">🎉</span>
       </div>
-      <div class="flex-1">
-        <h4 class="text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">Sukses Kirim ke BPJS!</h4>
-        <p class="text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium">${description}</p>
-        <button onclick="document.getElementById('toast-${toastId}').remove(); console.log('BPJS success detail viewed')" class="mt-3 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-medium rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105">
-          Lihat Detail
-        </button>
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-xl font-bold bg-gradient-to-r from-emerald-600 via-green-600 to-teal-600 bg-clip-text text-transparent">Sukses Kirim ke BPJS!</h4>
+        <p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1 font-medium break-words">${description}</p>
+        <div class="flex flex-col sm:flex-row gap-2 mt-3">
+          <button onclick="document.getElementById('toast-${toastId}').remove(); console.log('BPJS success detail viewed')" class="px-3 py-2 sm:px-4 sm:py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-xs sm:text-sm font-medium rounded-lg hover:from-emerald-600 hover:to-teal-600 transition-all transform hover:scale-105">
+            Lihat Detail
+          </button>
+          <button onclick="document.getElementById('toast-${toastId}').remove()"
+                  class="px-3 py-2 sm:px-4 sm:py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors">
+            Tutup
+          </button>
+        </div>
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -2055,7 +3204,7 @@ const showBpjsErrorToast = (title: string, description: string, options?: any) =
   const toastId = Date.now()
   const toastEl = document.createElement('div')
   toastEl.id = `toast-${toastId}`
-  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 dark:from-gray-800 dark:via-red-900/30 dark:to-rose-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-6 min-w-[500px] max-w-2xl animate-shake-once'
+  toastEl.className = 'fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] bg-gradient-to-br from-red-50 via-pink-50 to-rose-50 dark:from-gray-800 dark:via-red-900/30 dark:to-rose-900/30 shadow-2xl rounded-2xl border border-red-200 dark:border-red-700 backdrop-blur-md p-4 sm:p-6 w-[95vw] sm:w-[90vw] md:w-[80vw] lg:w-[70vw] xl:w-[60vw] max-w-2xl mx-4 animate-shake-once'
 
   // Format BPJS response JSON for display
   const formatBpjsResponse = (bpjsResponse: string) => {
@@ -2070,26 +3219,29 @@ const showBpjsErrorToast = (title: string, description: string, options?: any) =
   const formattedResponse = options?.bpjs_response ? formatBpjsResponse(options.bpjs_response) : ''
 
   toastEl.innerHTML = `
-    <div class="flex items-start gap-4">
-      <div class="w-14 h-14 bg-gradient-to-br from-red-500 via-pink-500 to-rose-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse">
-        <span class="text-white text-2xl">❌</span>
+    <div class="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+      <div class="w-10 h-10 sm:w-14 sm:h-14 bg-gradient-to-br from-red-500 via-pink-500 to-rose-500 rounded-full flex items-center justify-center flex-shrink-0 drop-shadow-lg animate-pulse mx-auto sm:mx-0">
+        <span class="text-white text-lg sm:text-2xl">❌</span>
       </div>
-      <div class="flex-1">
-        <h4 class="text-xl font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">${title}</h4>
-        <p class="text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium whitespace-pre-line">${description}</p>
+      <div class="flex-1 w-full text-center sm:text-left">
+        <h4 class="text-base sm:text-xl font-bold bg-gradient-to-r from-red-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">${title}</h4>
+        <p class="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-2 font-medium whitespace-pre-line break-words">${description}</p>
 
         ${formattedResponse ? `
-          <div class="mt-4 p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p class="text-xs font-mono text-gray-600 dark:text-gray-400 mb-2">BPJS Response:</p>
-            <pre class="text-xs font-mono text-gray-800 dark:text-gray-300 bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-40 overflow-y-auto">${formattedResponse}</pre>
+          <div class="mt-3 sm:mt-4 p-2 sm:p-3 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <p class="text-xs font-mono text-gray-600 dark:text-gray-400 mb-1 sm:mb-2">BPJS Response:</p>
+            <pre class="text-xs font-mono text-gray-800 dark:text-gray-300 bg-white dark:bg-gray-900 p-2 rounded border border-gray-300 dark:border-gray-600 overflow-x-auto max-h-32 sm:max-h-40 overflow-y-auto break-all">${formattedResponse}</pre>
           </div>
         ` : ''}
 
-        ${options?.error_code ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-2">Error Code: ${options.error_code}</p>` : ''}
+        ${options?.error_code ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1 sm:mt-2">Error Code: ${options.error_code}</p>` : ''}
         ${options?.error_type ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Error Type: ${options.error_type}</p>` : ''}
       </div>
-      <button onclick="document.getElementById('toast-${toastId}').remove()" class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors">
-        <i class="i-tabler-x text-xl"></i>
+      <button onclick="document.getElementById('toast-${toastId}').remove()"
+              class="absolute top-2 right-2 sm:relative flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 rounded-full transition-all duration-200 shadow-sm hover:shadow-md border border-gray-200 dark:border-gray-600"
+              title="Tutup notifikasi"
+              aria-label="Tutup notifikasi">
+        <i class="i-tabler-x text-base sm:text-lg"></i>
       </button>
     </div>
   `
@@ -2106,14 +3258,32 @@ const showBpjsErrorToast = (title: string, description: string, options?: any) =
 }
 
 // ========================================
-// EXISTING REFS (Tab Riwayat)
-// ========================================
-const selectedRowData = ref(null)
-const selectedVisitData = ref(null)
+// Loading state management for gambar radiologi
+const gambarLoadingStates = ref({} as Record<string, boolean>)
+
+const handleImageLoad = (event: Event) => {
+  const target = event.target as HTMLImageElement
+  const imageName = target.getAttribute('src') || ''
+
+  // Add or update loading state for this specific image
+  if (imageName) {
+    gambarLoadingStates.value[imageName] = true
+  }
+}
+
+const isGambarLoading = (imageName: string) => {
+  return gambarLoadingStates.value[imageName] || false
+}
+
+const ermrDetails = ref<any>(null)
 const isLoadingDetails = ref(false)
-const loadingVisitDetails = ref(false)
 const ermDetails = ref<any>(null)
 const visitDetails = ref<any>(null)
+const selectedRowData = ref(null)
+const selectedVisitData = ref(null)
+
+const loadingVisitDetails = ref(false)
+
 const sep = ref('')
 const noRawat = ref('')
 
@@ -2219,7 +3389,13 @@ const searchingLabSnomed = ref(false)
 
 // Procedure Billing refs
 const procedureBilling = ref([] as any[])
-const billingSummary = ref<any>(null)
+const billingSummary = ref<any>({
+  total_procedures: 0,
+  total_biaya: 0,
+  by_jenis_petugas: [],
+  by_status_rawat: [],
+  by_status_bayar: []
+})
 const topProcedures = ref([] as any[])
 const loadingBilling = ref(false)
 
@@ -2229,7 +3405,9 @@ const resepObat = ref([])
 const resepSummary = ref({
   totalResep: 0,
   totalObat: 0,
-  totalBiaya: 0
+  totalBiaya: 0,
+  ralanCount: 0,
+  ranapCount: 0
 })
 
 // Procedure Mapping refs
@@ -2244,6 +3422,88 @@ const procedureMapping = ref({
   status: 'active',
   notes: ''
 })
+
+// Lab History refs
+const showLabHistoryModal = ref(false)
+const labHistoryData = ref<any[]>([])
+const loadingLabHistory = ref(false)
+
+// Navigation state for floating navigation
+const activeSection = ref('diagnosis')
+const floatingNav = ref<HTMLElement | null>(null)
+
+// Handle scroll logic for floating navigation
+function handleScroll() {
+  if (!floatingNav.value) return
+
+  const riwayatSection = document.getElementById('section-riwayat-pemeriksaan')
+  if (!riwayatSection) return
+
+  // Calculate the bottom position of the riwayat section
+  const riwayatSectionBottom = riwayatSection.offsetTop + riwayatSection.offsetHeight
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+
+  // Show floating navigation only when scrolled past the riwayat section
+  if (scrollTop >= riwayatSectionBottom - 100) {
+    // Make floating navigation visible with fixed positioning so it scrolls with content
+    floatingNav.value.style.opacity = '1'
+    floatingNav.value.style.visibility = 'visible'
+    floatingNav.value.style.pointerEvents = 'auto'
+    floatingNav.value.style.position = 'fixed' // Use fixed so it follows scroll
+    floatingNav.value.style.top = '150px' // Position from top of viewport
+    floatingNav.value.style.left = '16px' // Position on the far left of the page
+    floatingNav.value.style.transform = 'translateY(0)' // No Y transform needed for fixed
+  } else {
+    // Hide floating navigation when scrolling back up to or before riwayat section
+    floatingNav.value.style.opacity = '0'
+    floatingNav.value.style.visibility = 'hidden'
+    floatingNav.value.style.pointerEvents = 'none'
+  }
+}
+
+// Scroll to section function
+function scrollToSection(sectionId: string) {
+  activeSection.value = sectionId
+
+  // Scroll to section after a small delay for animation
+  setTimeout(() => {
+    let elementId = sectionId === 'detail-pemeriksaan' ? 'section-detail-pemeriksaan' : `section-${sectionId}`
+    const element = document.getElementById(elementId)
+    if (element) {
+      // Find the section header within the element (h3, h2, or any title element)
+      const headerElement = element.querySelector('h3, h2, .text-lg, .text-xl, .text-2xl, [class*="font-semibold"]')
+      if (headerElement) {
+        // Calculate position for the header with some offset for better visibility
+        const headerPosition = headerElement.getBoundingClientRect().top + window.pageYOffset
+        const offsetPosition = headerPosition - 80 // 80px offset for better visibility
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        })
+      } else {
+        // Fallback to original behavior if no header found
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+
+      // Trigger scroll listener to update floating navigation position
+      handleScroll()
+    }
+  }, 100)
+}
+const labHistoryPagination = ref({
+  currentPage: 1,
+  totalPages: 0,
+  totalRecords: 0,
+  hasNextPage: false,
+  hasPrevPage: false,
+  perPage: 20
+})
+const labHistoryFilters = ref({
+  tanggalDari: '',
+  tanggalSampai: ''
+})
+
 const procedureSearchTerm = ref('')
 const procedureSearchResults = ref([] as any[])
 const searchingProcedureSnomed = ref(false)
@@ -2265,7 +3525,8 @@ const riwayatColumns = [
   { key: 'tglsep', label: 'Tgl. SEP' },
   { key: 'no_sep', label: 'No. SEP' },
   { key: 'no_rawat', label: 'No. Rawat' },
-  { key: 'jnspelayanan', label: 'Jenis' },
+  { key: 'jenis', label: 'Jenis' },
+  { key: 'poliklinik', label: 'Poliklinik' },
   { key: 'tgl_masuk', label: 'Tgl Masuk' },
   { key: 'tgl_keluar', label: 'Tgl Keluar' },
   { key: 'cbg', label: 'CBG' },
@@ -2274,6 +3535,7 @@ const riwayatColumns = [
   { key: 'actions', label: 'Aksi' }
 ]
 
+
 const codingColumns = [
   { key: 'no_sep', label: 'No. SEP' },
   { key: 'no_rawat', label: 'No. Rawat' },
@@ -2281,7 +3543,6 @@ const codingColumns = [
   { key: 'dokter', label: 'Dokter' },
   { key: 'tgl_kunjungan', label: 'Tgl Kunjungan' },
   { key: 'jenis', label: 'Jenis' }, // Rawat Inap/Jalan
-  { key: 'coding_status', label: 'Status Coding' },
   { key: 'actions', label: 'Aksi' }
 ]
 
@@ -2292,16 +3553,14 @@ const combinedColumns = [
   { key: 'poliklinik', label: 'Poliklinik' },
   { key: 'dokter', label: 'Dokter' },
   { key: 'status_klaim', label: 'Status Klaim' },
-  { key: 'coding_status', label: 'Status Coding' },
   { key: 'actions', label: 'Aksi' }
 ]
 
 const billingColumns = [
   { key: 'nm_perawatan', label: 'Tindakan' },
-  { key: 'jenis_petugas', label: 'Petugas' },
+  { key: 'nama_petugas', label: 'Petugas' },
   { key: 'biaya_rawat', label: 'Biaya' },
-  { key: 'waktu', label: 'Waktu' },
-  { key: 'stts_bayar', label: 'Status Bayar' }
+  { key: 'waktu', label: 'Waktu' }
 ]
 
 // ========================================
@@ -2367,6 +3626,79 @@ const currentPatient = computed(() => {
   }
 })
 
+// Process prescription data to group racikan components
+const processedResepObat = computed(() => {
+  if (!resepObat.value) return []
+
+  const result: any[] = []
+  const racikanComponents = new Set<string>()
+
+  // First pass: collect all racikan components and identify racikan headers
+  const racikanHeaders = resepObat.value.filter((obat: any) =>
+    obat.tipe_rawatan === 'Rawat Jalan' &&
+    obat.status_resep === 'Racik' &&
+    obat.racikan_detail &&
+    obat.racikan_detail.length > 0
+  )
+
+  // Collect all component codes from racikan details for Rawat Jalan
+  racikanHeaders.forEach((racikan: any) => {
+    racikan.racikan_detail.forEach((detail: any) => {
+      if (detail.kode_brng) {
+        racikanComponents.add(detail.kode_brng)
+      }
+    })
+  })
+
+  // Second pass: process medications
+  resepObat.value.forEach((obat: any) => {
+    // If it's a racikan header, create display with detailed components
+    if (obat.status_resep === 'Racik' && obat.racikan_detail && obat.racikan_detail.length > 0) {
+      // Format racikan display with detailed component information
+      const racikanName = obat.nama_brng
+      const componentDetails = obat.racikan_detail.map((detail: any) => {
+        // Extract dosage from kandungan field (e.g., "1 mg", "150 mg", etc.)
+        let dosage = detail.kandungan || '-'
+        // If kandungan contains multiple parts, extract the dosage part
+        if (detail.kandungan && typeof detail.kandungan === 'string') {
+          // Extract numeric values and units
+          const dosageMatch = detail.kandungan.match(/(\d+\.?\d*)\s*(mg|mcg|g|ml|iu|unit)/i)
+          if (dosageMatch) {
+            dosage = `${dosageMatch[1]} ${dosageMatch[2]}`
+          }
+        }
+
+        return `- ${detail.nama_brng || 'Tidak diketahui'} dosis ${dosage}, jml: ${detail.jml || 0}`
+      }).filter(Boolean)
+
+      const displayName = `Puyer ${racikanName}, isian:\n${componentDetails.join('\n   ')}`
+
+      result.push({
+        ...obat,
+        display_nama_brng: displayName,
+        is_racikan: true,
+        // Store original quantity for racikan header
+        original_jml: obat.jml
+      })
+    }
+    // Skip individual components that are part of racikan for Rawat Jalan
+    else if (obat.tipe_rawatan === 'Rawat Jalan' && racikanComponents.has(obat.kode_brng)) {
+      // Skip this item - it's a component that will be shown as part of racikan header
+      console.log(`🚫 Skipping racikan component: ${obat.nama_brng} (${obat.kode_brng})`)
+    }
+    // Non-racikan medication or Rawat Inap (keep individual components for Rawat Inap)
+    else {
+      result.push({
+        ...obat,
+        display_nama_brng: obat.nama_brng,
+        is_racikan: false
+      })
+    }
+  })
+
+  return result
+})
+
 // ========================================
 // WATCHERS
 // ========================================
@@ -2389,7 +3721,7 @@ watch(copied, (val) => {
 })
 
 // Auto-load coding queue when component mounts and patient data is available
-watch(() => currentPatient.value.no_rkm_medis, (noRkmMedis) => {
+watch(() => currentPatient.value?.no_rkm_medis, (noRkmMedis) => {
   if (noRkmMedis) {
     fetchCodingQueue()
   }
@@ -2525,10 +3857,64 @@ async function copyBundleToClipboard() {
 }
 
 /**
+ * Download bundle as JSON file
+ */
+function downloadBundleAsJson() {
+  if (!currentBundle.value) {
+    return
+  }
+
+  try {
+    // Get patient information for filename
+    const patientName = selectedVisitData.value?.nm_pasien || 'Unknown'
+    const noSep = selectedVisitData.value?.no_sep || 'NoSEP'
+    const noRawat = selectedVisitData.value?.no_rawat || 'NoRawat'
+
+    // Create filename with timestamp (using noSep instead of patient name)
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-')
+    const filename = `FHIR-Bundle-${noSep}-${timestamp}.json`
+
+    // Convert bundle to pretty JSON
+    const bundleJson = JSON.stringify(currentBundle.value, null, 2)
+
+    // Create blob
+    const blob = new Blob([bundleJson], { type: 'application/json' })
+
+    // Create download link
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+
+    // Trigger download
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+
+    // Clean up URL
+    URL.revokeObjectURL(url)
+
+    // Show success toast
+    useToast().add({
+      title: 'Bundle Downloaded',
+      description: `FHIR Bundle saved as ${filename}`,
+      color: 'green'
+    })
+  } catch (error) {
+    console.error('Error downloading bundle:', error)
+    useToast().add({
+      title: 'Download Error',
+      description: 'Failed to download bundle as JSON',
+      color: 'red'
+    })
+  }
+}
+
+/**
  * Fetch coding queue untuk pasien ini saja
  */
 async function fetchCodingQueue() {
-  if (!currentPatient.value.no_rkm_medis) {
+  if (!currentPatient.value?.no_rkm_medis) {
     return
   }
 
@@ -2539,12 +3925,13 @@ async function fetchCodingQueue() {
       {
         method: 'GET',
         params: {
-          no_rkm_medis: currentPatient.value.no_rkm_medis,
+          no_rkm_medis: currentPatient.value?.no_rkm_medis,
           status: codingStatusFilter.value
         },
         headers: {
           'Authorization': `Bearer ${tokenStore.accessToken}`
-        }
+        },
+        server: false // Force client-side to avoid SSR issues
       }
     )
 
@@ -2554,9 +3941,10 @@ async function fetchCodingQueue() {
     } else {
       codingQueue.value = queueData.value?.data || []
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching coding queue:', err)
     codingQueue.value = []
+    // Don't throw to prevent cascading errors
   } finally {
     loadingCodingQueue.value = false
   }
@@ -2836,8 +4224,7 @@ async function confirmAddMapping() {
       body: JSON.stringify(mapping)
     })
 
-    console.log('SOAP mapping save response:', response)
-
+    
     if (response && response.success) {
       // Add to local state after successful database save
       codingForm.value.mappings.push(mapping)
@@ -3012,6 +4399,8 @@ function closeModalCoding() {
 // EXISTING FUNCTIONS (Tab Riwayat)
 // ========================================
 
+// SIDEBAR FUNCTIONS REMOVED
+
 async function handleRowClick(row: any) {
   // Set selected visit data regardless of klaim status
   selectedVisitData.value = row
@@ -3019,12 +4408,14 @@ async function handleRowClick(row: any) {
   sep.value = row.no_sep || ''
   noRawat.value = row.no_rawat || ''
 
+  // Reset to diagnosis section for floating navigation
+  activeSection.value = 'diagnosis'
+
   // Always fetch visit details and SNOMED data
   await fetchVisitDetails(row.no_sep)
 
   // Check klaim status and fetch ERM details if available
-  const kemkesStatus = getKlaimStatus(row)
-
+  const kemkesStatus = await getKlaimStatus(row)
 
   if (kemkesStatus === 'sent' && sep.value) {
     await fetchErmDetails(sep.value)
@@ -3033,13 +4424,51 @@ async function handleRowClick(row: any) {
     ermDetails.value = null
   }
 
+  // Check if this is rawat inap and fetch pemeriksaan ranap data
+  const isRawatInap = row.jnspelayanan === '1' || row.jnspelayanan === 'Ranap' ||
+                      (row.jnspelayanan && row.jnspelayanan.includes('Ranap'))
+
+  console.log('🏥 Rawat Inap detection:', {
+    'row.jnspelayanan': row.jnspelayanan,
+    'row.no_sep': row.no_sep,
+    'isRawatInap': isRawatInap
+  })
+
+  // Use SEP directly from row if available, fallback to visitDetails
+  const sepNumber = row.no_sep || visitDetails.value?.sep?.no_sep || selectedVisitData.value?.no_sep
+
+  if (isRawatInap && sepNumber) {
+    console.log('🏥 Rawat Inap detected - pemeriksaan ranap data will be loaded from main API')
+    console.log(`🔗 Using SEP number: ${sepNumber}`)
+
+    // Data pemeriksaan ranap sudah di-load dari fetchVisitDetails() via API /erm/details/{no_sep}
+    // Tidak perlu memanggil fetchPemeriksaanRanap() lagi
+  } else {
+    console.log('ℹ️ Not a rawat inap or no SEP available')
+    console.log(`🔍 Details - isRawatInap: ${isRawatInap}, sepNumber: ${sepNumber}`)
+  }
+
   // Show info about klaim status if not sent
   if (kemkesStatus !== 'sent') {
     showInfoToast('ℹ️ Status Klaim', kemkesStatus ? `Status klaim: ${kemkesStatus}` : 'Status klaim tidak tersedia. Detail ERM hanya tersedia jika status klaim sudah "sent".', {
       timeout: 5000
     })
   }
+
+  // Auto scroll to detail section after a short delay to ensure content is rendered
+  nextTick(() => {
+    setTimeout(() => {
+      const detailSection = document.getElementById('section-detail-pemeriksaan')
+      if (detailSection) {
+        detailSection.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        })
+      }
+    }, 300)
+  })
 }
+
 
 /**
  * Fetch visit details for inline display
@@ -3047,6 +4476,7 @@ async function handleRowClick(row: any) {
 async function fetchVisitDetails(no_sep: string) {
   loadingVisitDetails.value = true
   visitDetails.value = null
+
   try {
     const { data: detailsData, error } = await useFetch(
       `${config.public.API_V2_URL}/erm/details/${no_sep}`,
@@ -3070,58 +4500,60 @@ async function fetchVisitDetails(no_sep: string) {
       visitDetails.value = null
     } else {
       visitDetails.value = detailsData.value?.data?.data || detailsData.value?.data
+
+      // Console log untuk pemeriksaan radiologi dari backend
+      if (visitDetails.value?.radiologi) {
+        console.log('🏥 DATA RADIOLOGI DARI BACKEND:', visitDetails.value.radiologi)
+        console.log('📋 Jumlah data radiologi:', Array.isArray(visitDetails.value.radiologi) ? visitDetails.value.radiologi.length : 'Bukan array')
+        console.log('📊 Tipe data radiologi:', typeof visitDetails.value.radiologi)
+
+        // Jika array, log detail setiap item
+        if (Array.isArray(visitDetails.value.radiologi)) {
+          visitDetails.value.radiologi.forEach((item: any, index: number) => {
+            console.log(`📌 Radiologi item ${index + 1}:`, {
+              jenis_perawatan: item.jenis_perawatan,
+              tgl_periksa: item.tgl_periksa,
+              hasil: item.hasil,
+              kesan: item.kesan,
+              dokter: item.dokter
+            })
+          })
+        }
+      } else {
+        console.log('❌ Tidak ada data radiologi ditemukan')
+      }
+
       // Load SNOMED suggestions and mappings
       await loadSNOMEDData(no_sep)
       console.log('About to call loadLabMappings...')
       // Load existing lab mappings
       await loadLabMappings()
       console.log('loadLabMappings completed')
-      // Load procedure billing data
+      // Load procedure billing data (now includes SNOMED mappings)
       await loadProcedureBilling()
 
-      // Use existing obat data instead of fetching from separate API
-      if (visitDetails.value?.obat && visitDetails.value.obat.length > 0) {
-        resepObat.value = visitDetails.value.obat.map((obatItem: any) => ({
-          no_resep: obatItem.no_rawat,
-          tgl_peresepan: obatItem.tgl_perawatan,
-          jam_peresepan: obatItem.jam,
-          status: obatItem.status,
-          dokter: visitDetails.value?.registrasi?.dokter?.nm_dokter || 'Dokter',
-          detail: [{
-            kode_brng: obatItem.kode_brng,
-            jml: obatItem.jml,
-            h_beli: obatItem.h_beli,
-            total: obatItem.total,
-            aturan: obatItem.aturan_pakai?.aturan || 'N/A',
-            no_batch: obatItem.no_batch || '',
-            obat: {
-              nama_brng: obatItem.obat?.nama_brng || 'Unknown',
-              kode_brng: obatItem.kode_brng,
-              kode_sat: obatItem.obat?.kode_sat || 'N/A'
-            }
-          }]
-        }))
+      // Map cppt_pemeriksaan to pemeriksaan_ranap for frontend compatibility
+      if (visitDetails.value?.cppt_pemeriksaan) {
+        visitDetails.value.pemeriksaan_ranap = visitDetails.value.cppt_pemeriksaan
+        console.log('🔄 Mapped cppt_pemeriksaan to pemeriksaan_ranap:', {
+          count: visitDetails.value.cppt_pemeriksaan.length,
+          data: visitDetails.value.cppt_pemeriksaan.map((item: any) => ({
+            ...item,
+            doctor_name: item.petugas?.nama || item.petugas?.nm_petugas || item.nm_dokter || item.kd_dokter,
+            petugas_data: item.petugas
+          }))
+        })
+      }
 
-        // Calculate summary
-        const totalObatCount = resepObat.value.length
-        const totalBiayaAmount = resepObat.value.reduce((sum: number, resep: any) =>
-          sum + (resep.detail?.reduce((detailSum: number, detail: any) => detailSum + (detail.total || 0), 0) || 0), 0
-        )
-
-        resepSummary.value = {
-          totalResep: totalObatCount,
-          totalObat: totalObatCount,
-          totalBiaya: totalBiayaAmount
-        }
-
-        console.log(`✅ Used existing obat data: ${resepSummary.value.totalResep} medications`)
+      // Set resepObat directly from API response
+      if (visitDetails.value?.obat) {
+        resepObat.value = visitDetails.value.obat
       }
 
       console.log('Visit details loaded:', visitDetails.value)
       console.log('Resep obat processed:', resepObat.value)
     }
-
-  } catch (err) {
+    } catch (err) {
     console.error("Exception fetching visit details:", err)
     toast.add({
       icon: 'i-tabler-circle-x',
@@ -3154,8 +4586,7 @@ async function loadSNOMEDData(no_sep: string) {
 
     if ((mappingData.value as any)?.data?.existing_coding?.clinical_notes_snomed) {
       soapMappings.value = (mappingData.value as any).data.existing_coding.clinical_notes_snomed
-      console.log(`✅ Loaded ${soapMappings.value.length} SOAP mappings for SEP: ${no_sep}`)
-    } else {
+          } else {
       soapMappings.value = []
     }
 
@@ -3165,6 +4596,239 @@ async function loadSNOMEDData(no_sep: string) {
     }
   } catch (err) {
     console.error("Error loading SNOMED data:", err)
+  }
+}
+
+/**
+ * Fetch pemeriksaan ranap data from sikrsia.pemeriksaan_ranap table
+ * @deprecated - Data now loaded from main API /erm/details/{no_sep} via fetchVisitDetails()
+ */
+/*
+async function fetchPemeriksaanRanap(sepNumber?: string) {
+  console.log('🚀 fetchPemeriksaanRanap called with SEP:', sepNumber)
+  
+  // Try to get SEP number from multiple sources
+  const actualSepNumber = sepNumber ||
+                        visitDetails.value?.sep?.no_sep ||
+                        selectedVisitData.value?.no_sep ||
+                        visitDetails.value?.registrasi?.no_sep ||
+                        sep.value
+
+  console.log('🎯 Final SEP number to use:', actualSepNumber)
+
+  if (!actualSepNumber) {
+    console.log('❌ No SEP available for fetchPemeriksaanRanap')
+    return
+  }
+
+  console.log(`🌐 Fetching from: ${config.public.API_V2_URL}/pemeriksaan/ranap/${actualSepNumber}`)
+
+  try {
+    const { data: pemeriksaanRanapData, error } = await $fetch(
+      `${config.public.API_V2_URL}/pemeriksaan/ranap/${actualSepNumber}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${tokenStore.accessToken}`
+        }
+      }
+    )
+
+    if (error.value) {
+      console.error("❌ Error fetching pemeriksaan ranap:", error.value)
+      toast.add({
+        icon: 'i-tabler-circle-x',
+        title: 'Error',
+        description: 'Gagal memuat detail pemeriksaan rawat inap. Hubungi administrator.',
+        color: 'red',
+        timeout: 5000
+      })
+      return
+    }
+
+    // Store pemeriksaan ranap data for FHIR integration
+    console.log('📄 Raw API response:', pemeriksaanRanapData.value)
+    const ranapData = (pemeriksaanRanapData.value as any)?.data || pemeriksaanRanapData.value
+    console.log('✅ Loaded pemeriksaan ranap data:', ranapData)
+    console.log('📊 Data type:', typeof ranapData)
+    console.log('🔢 Data length:', ranapData?.length || 'N/A')
+
+    // Add to visitDetails for easy access
+    if (visitDetails.value) {
+      // Force reactivity update
+      visitDetails.value.pemeriksaan_ranap = ranapData
+
+      // Force Vue to detect the change
+      visitDetails.value = {...visitDetails.value}
+
+      console.log('💾 Added to visitDetails.pemeriksaan_ranap:', visitDetails.value.pemeriksaan_ranap)
+      console.log('🎯 Should show in UI?:', !!visitDetails.value.pemeriksaan_ranap)
+      console.log('🎯 Array check:', Array.isArray(visitDetails.value.pemeriksaan_ranap))
+      console.log('🎯 Length check:', visitDetails.value.pemeriksaan_ranap?.length || 0)
+
+      // Force Vue update after a brief delay to ensure reactivity
+      nextTick(() => {
+        console.log('🔄 After nextTick - pemeriksaan_ranap:', visitDetails.value?.pemeriksaan_ranap)
+      })
+    } else {
+      console.log('❌ visitDetails.value is null, cannot store pemeriksaan_ranap')
+    }
+
+  } catch (err) {
+    console.error("Exception fetching pemeriksaan ranap:", err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Terjadi kesalahan saat memuat detail pemeriksaan rawat inap.',
+      color: 'red',
+      timeout: 5000
+    })
+  }
+}
+*/
+
+/**
+ * Fetch pemeriksaan ranap data for FHIR Bundle integration
+ */
+async function fetchPemeriksaanRanapFhir() {
+  if (!visitDetails.value?.pemeriksaan_ranap) {
+    console.log('No pemeriksaan ranap data available for FHIR integration')
+    return
+  }
+
+  try {
+    const ranapData = visitDetails.value.pemeriksaan_ranap as any[]
+    console.log('🔄 Processing pemeriksaan ranap for FHIR Bundle:', ranapData)
+
+    // Create FHIR resources for ranap SOAP notes
+    const ranapSoapEntries = []
+
+    if (ranapData && ranapData.length > 0) {
+      for (const [index, soapData] of ranapData.entries()) {
+        const soapResourceId = `${organizationId}-${index}-soap-${generateUUID()}`
+
+        const ranapSoapResource = {
+          resourceType: 'Composition',
+          id: soapResourceId,
+          status: 'final',
+          type: {
+            coding: [{
+              system: "http://loinc.org",
+              code: "11488-4",
+              display: "Discharge summary (unstructured)"
+            }]
+          },
+          subject: {
+            reference: `Patient/${patientId}`,
+            display: patientName,
+            noSep: visitDetails.value?.sep?.no_sep
+          },
+          date: soapData.tgl_perawatan || new Date().toISOString(),
+          author: [{
+            reference: `Practitioner/${practitionerId}`,
+            display: practitionerName
+          }],
+          title: 'Resume Rawat Inap',
+          confidentiality: 'N',
+          section: {
+            '0': {
+              title: "Anamnesis",
+              code: {
+                coding: [{
+                  system: "http://loinc.org",
+                  code: "10164-2",
+                  display: "History of Present Illness"
+                }]
+              },
+              text: {
+                status: "additional",
+                div: soapData.suhu_tubuh || 'Tidak ada keluhan suhu'
+              },
+              entry: null
+            },
+            '1': {
+              title: "Pemeriksaan Fisik",
+              code: {
+                coding: [{
+                  system: "http://loinc.org",
+                  code: "29545-1",
+                  display: "Physical findings"
+                }]
+              },
+              text: {
+                status: "additional",
+                div: soapData.pemeriksaan_fisik || 'Tidak ada pemeriksaan fisik'
+              },
+              entry: null
+            },
+            '2': {
+              title: "Diagnosis",
+              code: {
+                coding: [{
+                  system: "http://loinc.org",
+                  code: "29548-5",
+                  display: "Diagnostic results"
+                }]
+              },
+              text: {
+                status: "additional",
+                div: soapData.diagnosa_utama || 'Tidak ada diagnosa'
+              },
+              entry: null
+            },
+            '3': {
+              title: "Terapi",
+              code: {
+                coding: [{
+                  system: "http://loinc.org",
+                  code: "62303-7",
+                  display: "Medication administration"
+                }]
+              },
+              text: {
+                status: "additional",
+                div: soapData.rencana_terapi || 'Tidak ada rencana terapi'
+              },
+              entry: null
+            },
+            '4': {
+              title: "Catatan Penting",
+              code: {
+                coding: [{
+                  system: "http://loinc.org",
+                  code: "55109-3",
+                  display: "Reason for visit"
+                }]
+              },
+              text: {
+                status: "additional",
+                div: soapData.catatan_dokter || 'Tidak ada catatan'
+              },
+              entry: null
+            }
+          }
+        }
+
+        ranapSoapEntries.push({
+          resource: ranapSoapResource
+        })
+
+        console.log(`✅ Created Ranap SOAP Composition: ${soapResourceId}`)
+      }
+    }
+
+    // Add ranap SOAP entries to finalEntries
+    finalEntries.push(...ranapSoapEntries)
+
+  } catch (err) {
+    console.error("Error processing pemeriksaan ranap for FHIR:", err)
+    toast.add({
+      icon: 'i-tabler-circle-x',
+      title: 'Error',
+      description: 'Gagal memproses pemeriksaan rawat inap untuk FHIR.',
+      color: 'red',
+      timeout: 5000
+    })
   }
 }
 
@@ -3694,6 +5358,405 @@ function closeLabMapping() {
   currentLabContext.value = null
 }
 
+// ========================================
+// LAB RESULTS HELPER FUNCTIONS
+// ========================================
+
+/**
+ * Check if this is a grouped lab test (like blood count with multiple parameters)
+ */
+function isGroupedLabTest(details: any[]): boolean {
+  if (!details || details.length <= 1) return false
+
+  // Check if all items have the same template or are part of a comprehensive test
+  const hasTemplateNames = details.some(d => d.Pemeriksaan || d.template_laboratorium?.Pemeriksaan)
+  const hasIndividualNames = details.some(d => d.pemeriksaan || d.nama_pemeriksaan)
+
+  // Grouped test typically has template names but individual parameter names
+  return hasTemplateNames && hasIndividualNames && details.length > 3
+}
+
+/**
+ * Get the proper parameter name from various possible fields
+ */
+function getParameterName(detail: any): string {
+  // Simple: Use the same logic as labDetailColumns - template.Pemeriksaan
+  return detail.template?.Pemeriksaan || 'Pemeriksaan'
+}
+
+/**
+ * Get parameter name by index/sequence if no name is available
+ */
+function getParameterNameByIndex(detail: any): string | null {
+  // Try to determine the parameter based on reference ranges or values
+  const nilai = parseFloat(detail.nilai)
+  const refRange = detail.nilai_rujukan || ''
+
+
+}
+
+/**
+ * Get parameter status (H/L/N for high/low/normal)
+ */
+function getParameterStatus(detail: any): string | null {
+  // Try different field names for status
+  return detail.status ||
+         detail.flag ||
+         detail.indikator ||
+         detail.keterangan_status ||
+         null
+}
+
+/**
+ * Get color for parameter status
+ */
+function getParameterStatusColor(detail: any): string {
+  const status = getParameterStatus(detail)
+
+  if (status) {
+    const upperStatus = status.toString().toUpperCase()
+    if (upperStatus === 'H' || upperStatus === 'HIGH') return 'red'
+    if (upperStatus === 'L' || upperStatus === 'LOW') return 'blue'
+    if (upperStatus === 'N' || upperStatus === 'NORMAL') return 'green'
+  }
+
+  return 'gray'
+}
+
+/**
+ * Get color class for lab result value based on H/L indicators
+ */
+function getResultColorClass(detail: any): string {
+  const nilai = (detail.nilai || '').toString().trim()
+  const keterangan = (detail.keterangan || '').toString().trim()
+
+  // Check for status/flag fields first
+  const status = getParameterStatus(detail)
+  if (status) {
+    const upperStatus = status.toString().toUpperCase()
+    if (upperStatus === 'H' || upperStatus === 'HIGH') {
+      return 'text-red-600 dark:text-red-400 font-bold'
+    }
+    if (upperStatus === 'L' || upperStatus === 'LOW') {
+      return 'text-blue-600 dark:text-blue-400 font-bold'
+    }
+  }
+
+  // Check if nilai contains H or L (case insensitive)
+  const upperNilai = nilai.toUpperCase()
+  const upperKeterangan = keterangan.toUpperCase()
+
+  // Check for H indicators
+  if (upperNilai.includes('H') ||
+      upperKeterangan.includes('H') ||
+      upperNilai.includes('HIGH') ||
+      upperKeterangan.includes('HIGH') ||
+      upperNilai.includes('TINGGI')) {
+    return 'text-red-600 dark:text-red-400 font-bold'
+  }
+
+  // Check for L indicators
+  if (upperNilai.includes('L') ||
+      upperKeterangan.includes('L') ||
+      upperNilai.includes('LOW') ||
+      upperKeterangan.includes('LOW') ||
+      upperNilai.includes('RENDAH')) {
+    return 'text-blue-600 dark:text-blue-400 font-bold'
+  }
+
+  return 'text-gray-900 dark:text-white'
+}
+
+/**
+ * Get size class for lab result value
+ */
+function getResultSizeClass(isSingle: boolean = false): string {
+  return isSingle ? 'text-2xl' : 'text-lg'
+}
+
+/**
+ * Open lab history modal
+ */
+async function openLabHistoryModal() {
+  // Coba dapatkan no_rkm_medis dari berbagai sumber
+  const noRkmMedis = selectedVisitData.value?.no_rkm_medis ||
+                     selectedVisitData.value?.regPeriksa?.no_rkm_medis ||
+                     selectedVisitData.value?.pasien?.no_rkm_medis ||
+                     selectedVisitData.value?.nomr
+
+  console.log('🔍 DEBUG: Lab History Modal Data Source:', {
+    noRkmMedis,
+    selectedVisitData: selectedVisitData.value,
+    fullDataStructure: JSON.stringify(selectedVisitData.value, null, 2)
+  })
+
+  if (!noRkmMedis) {
+    toast.add({
+      title: 'Error',
+      description: 'Data pasien tidak ditemukan',
+      color: 'red'
+    })
+    return
+  }
+
+  try {
+    loadingLabHistory.value = true
+    labHistoryPagination.value.currentPage = 1
+
+    console.log('🌐 DEBUG: Making API request for lab history:', {
+      url: `${config.public.API_V2_URL}/erm/riwayat-lab`,
+      no_rkm_medis: noRkmMedis,
+      limit: labHistoryPagination.value.perPage,
+      page: labHistoryPagination.value.currentPage,
+      filters: labHistoryFilters.value
+    })
+
+    const response = await $fetch(`${config.public.API_V2_URL}/erm/riwayat-lab`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      query: {
+        no_rkm_medis: noRkmMedis,
+        limit: labHistoryPagination.value.perPage,
+        page: labHistoryPagination.value.currentPage,
+        ...(labHistoryFilters.value.tanggalDari && { tanggal_dari: labHistoryFilters.value.tanggalDari }),
+        ...(labHistoryFilters.value.tanggalSampai && { tanggal_sampai: labHistoryFilters.value.tanggalSampai })
+      }
+    })
+
+    console.log('📊 DEBUG: Lab History API Response:', {
+      success: response?.success,
+      data: response?.data,
+      pagination: response?.pagination,
+      fullResponse: JSON.stringify(response, null, 2)
+    })
+
+    if (response.success) {
+      labHistoryData.value = response.data
+      labHistoryPagination.value = {
+        ...labHistoryPagination.value,
+        ...response.pagination
+      }
+
+      // Log structure of lab history data
+      if (response.data && response.data.length > 0) {
+        console.log('🔬 DEBUG: Lab History Data Structure:', {
+          totalItems: response.data.length,
+          firstItemKeys: Object.keys(response.data[0] || {}),
+          firstItemSample: response.data[0],
+          detailKeys: response.data[0]?.detail_periksa_lab ? Object.keys(response.data[0].detail_periksa_lab[0] || {}) : 'No detail_periksa_lab',
+          sampleDetail: response.data[0]?.detail_periksa_lab?.[0] || 'No detail sample'
+        })
+      }
+
+      showLabHistoryModal.value = true
+    } else {
+      toast.add({
+        title: 'Error',
+        description: response.message || 'Gagal mengambil data riwayat lab',
+        color: 'red'
+      })
+    }
+  } catch (error) {
+    console.error('Error fetching lab history:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Terjadi kesalahan saat mengambil data riwayat lab',
+      color: 'red'
+    })
+  } finally {
+    loadingLabHistory.value = false
+  }
+}
+
+/**
+ * Search lab history with filters
+ */
+async function searchLabHistory() {
+  // Coba dapatkan no_rkm_medis dari berbagai sumber
+  const noRkmMedis = selectedVisitData.value?.no_rkm_medis ||
+                     selectedVisitData.value?.regPeriksa?.no_rkm_medis ||
+                     selectedVisitData.value?.pasien?.no_rkm_medis
+
+  if (!noRkmMedis) {
+    toast.add({
+      title: 'Error',
+      description: 'Data pasien tidak ditemukan',
+      color: 'red'
+    })
+    return
+  }
+
+  try {
+    loadingLabHistory.value = true
+    labHistoryPagination.value.currentPage = 1
+
+    const response = await $fetch(`${config.public.API_V2_URL}/erm/riwayat-lab`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      query: {
+        no_rkm_medis: noRkmMedis,
+        limit: labHistoryPagination.value.perPage,
+        page: 1,
+        ...(labHistoryFilters.value.tanggalDari && { tanggal_dari: labHistoryFilters.value.tanggalDari }),
+        ...(labHistoryFilters.value.tanggalSampai && { tanggal_sampai: labHistoryFilters.value.tanggalSampai })
+      }
+    })
+
+    if (response.success) {
+      labHistoryData.value = response.data
+      labHistoryPagination.value = {
+        ...labHistoryPagination.value,
+        ...response.pagination
+      }
+    } else {
+      toast.add({
+        title: 'Error',
+        description: response.message || 'Gagal mengambil data riwayat lab',
+        color: 'red'
+      })
+    }
+  } catch (error) {
+    console.error('Error searching lab history:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Terjadi kesalahan saat mengambil data riwayat lab',
+      color: 'red'
+    })
+  } finally {
+    loadingLabHistory.value = false
+  }
+}
+
+/**
+ * Go to next page of lab history
+ */
+async function nextLabHistoryPage() {
+  if (!labHistoryPagination.value.hasNextPage || loadingLabHistory.value) return
+
+  // Coba dapatkan no_rkm_medis dari berbagai sumber
+  const noRkmMedis = selectedVisitData.value?.no_rkm_medis ||
+                     selectedVisitData.value?.regPeriksa?.no_rkm_medis ||
+                     selectedVisitData.value?.pasien?.no_rkm_medis ||
+                     selectedVisitData.value?.nomr
+
+  if (!noRkmMedis) {
+    toast.add({
+      title: 'Error',
+      description: 'Data pasien tidak ditemukan',
+      color: 'red'
+    })
+    return
+  }
+
+  try {
+    loadingLabHistory.value = true
+    const nextPage = labHistoryPagination.value.currentPage + 1
+
+    const response = await $fetch(`${config.public.API_V2_URL}/erm/riwayat-lab`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      query: {
+        no_rkm_medis: noRkmMedis,
+        limit: labHistoryPagination.value.perPage,
+        page: nextPage,
+        ...(labHistoryFilters.value.tanggalDari && { tanggal_dari: labHistoryFilters.value.tanggalDari }),
+        ...(labHistoryFilters.value.tanggalSampai && { tanggal_sampai: labHistoryFilters.value.tanggalSampai })
+      }
+    })
+
+    if (response.success) {
+      labHistoryData.value = response.data
+      labHistoryPagination.value = {
+        ...labHistoryPagination.value,
+        currentPage: nextPage,
+        ...response.pagination
+      }
+    }
+  } catch (error) {
+    console.error('Error loading next page:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Gagal memuat halaman selanjutnya',
+      color: 'red'
+    })
+  } finally {
+    loadingLabHistory.value = false
+  }
+}
+
+/**
+ * Go to previous page of lab history
+ */
+async function previousLabHistoryPage() {
+  if (!labHistoryPagination.value.hasPrevPage || loadingLabHistory.value) return
+
+  // Coba dapatkan no_rkm_medis dari berbagai sumber
+  const noRkmMedis = selectedVisitData.value?.no_rkm_medis ||
+                     selectedVisitData.value?.regPeriksa?.no_rkm_medis ||
+                     selectedVisitData.value?.pasien?.no_rkm_medis ||
+                     selectedVisitData.value?.nomr
+
+  if (!noRkmMedis) {
+    toast.add({
+      title: 'Error',
+      description: 'Data pasien tidak ditemukan',
+      color: 'red'
+    })
+    return
+  }
+
+  try {
+    loadingLabHistory.value = true
+    const prevPage = labHistoryPagination.value.currentPage - 1
+
+    const response = await $fetch(`${config.public.API_V2_URL}/erm/riwayat-lab`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${tokenStore.accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      query: {
+        no_rkm_medis: noRkmMedis,
+        limit: labHistoryPagination.value.perPage,
+        page: prevPage,
+        ...(labHistoryFilters.value.tanggalDari && { tanggal_dari: labHistoryFilters.value.tanggalDari }),
+        ...(labHistoryFilters.value.tanggalSampai && { tanggal_sampai: labHistoryFilters.value.tanggalSampai })
+      }
+    })
+
+    if (response.success) {
+      labHistoryData.value = response.data
+      labHistoryPagination.value = {
+        ...labHistoryPagination.value,
+        currentPage: prevPage,
+        ...response.pagination
+      }
+    }
+  } catch (error) {
+    console.error('Error loading previous page:', error)
+    toast.add({
+      title: 'Error',
+      description: 'Gagal memuat halaman sebelumnya',
+      color: 'red'
+    })
+  } finally {
+    loadingLabHistory.value = false
+  }
+}
+
 /**
  * Search SNOMED for lab (debounced)
  */
@@ -4035,7 +6098,7 @@ async function removeLabMapping(mapping: any, index: number) {
  * Get klaim status for badge
  */
 function getKlaimStatusBadge(row: any): string {
-  const status = getKlaimStatus(row)
+  const status = getKlaimStatusSync(row)
   switch (status) {
     case 'sent': return 'Sent'
     case 'unsent': return 'Belum Sent'
@@ -4048,7 +6111,7 @@ function getKlaimStatusBadge(row: any): string {
  * Get klaim status color
  */
 function getKlaimStatusColor(row: any): string {
-  const status = getKlaimStatus(row)
+  const status = getKlaimStatusSync(row)
   switch (status) {
     case 'sent': return 'green'
     case 'unsent': return 'yellow'
@@ -4062,7 +6125,7 @@ function getKlaimStatusColor(row: any): string {
  */
 const klaimStatusMap = reactive<Record<string, string>>({})
 
-function getKlaimStatus(row: any): string {
+function getKlaimStatusSync(row: any): string {
   const sep = row.no_sep
 
   // If we've already processed this SEP, return cached result
@@ -4070,21 +6133,149 @@ function getKlaimStatus(row: any): string {
     return klaimStatusMap[sep]
   }
 
-  // Process status and cache it (client-side only)
-  if (import.meta.client && row?.rsia_klaim_idrg?.send_klaim_res) {
+  // Start async fetch in background if not already cached
+  if (!klaimStatusMap[sep] && !klaimStatusMap[`${sep}_fetching`]) {
+    klaimStatusMap[`${sep}_fetching`] = true
+    getKlaimStatus(row)
+  }
+
+  // Return initial status based on available data (sync)
+  let status = 'unsent'
+
+  // Try to get status from send_klaim_res field in rsia_klaim_idrg table
+  if (row?.rsia_klaim_idrg?.send_klaim_res) {
     try {
-      const sendKlaimRes = row.rsia_klaim_idrg.send_klaim_res
-      const parsed = JSON.parse(sendKlaimRes)
-      const status = parsed.response?.data?.[0]?.kemkes_dc_status || 'unsent'
-      klaimStatusMap[sep] = status
-      return status
-    } catch {
-      klaimStatusMap[sep] = 'unsent'
-      return 'unsent'
+      // Parse the JSON response from send_klaim_res
+      const klaimResponse = typeof row.rsia_klaim_idrg.send_klaim_res === 'string'
+        ? JSON.parse(row.rsia_klaim_idrg.send_klaim_res)
+        : row.rsia_klaim_idrg.send_klaim_res
+
+      // Prioritize kemkes_dc_status first, then bpjs_dc_status
+      if (klaimResponse?.kemkes_dc_status === 'sent') {
+        status = 'sent'
+      } else if (klaimResponse?.bpjs_dc_status === 'sent') {
+        status = 'sent'
+      } else if (klaimResponse?.kemkes_dc_status === 'pending' || klaimResponse?.bpjs_dc_status === 'pending') {
+        status = 'pending'
+      }
+    } catch (error) {
+      // Fallback to checking if send_klaim_res exists
+      status = row.rsia_klaim_idrg.send_klaim_res ? 'sent' : 'unsent'
+    }
+  } else {
+    // Last fallback: check if SEP exists in inacbg_data_terkirim table
+    status = row?.inacbgDataTerkirim ? 'sent' : 'unsent'
+  }
+
+  return status
+}
+
+async function getKlaimStatus(row: any): Promise<string> {
+  const sep = row.no_sep
+
+  // If we've already processed this SEP, return cached result
+  if (klaimStatusMap[sep] && klaimStatusMap[sep] !== 'loading') {
+    return klaimStatusMap[sep]
+  }
+
+  // Set loading state
+  klaimStatusMap[sep] = 'loading'
+
+  
+  let status = 'unsent'
+
+  // First try to get status from API that provides kemkes_dc_status
+  try {
+    const config = useRuntimeConfig()
+    const tokenStore = useAccessTokenStore()
+
+    const response = await $fetch(`${config.public.API_V2_URL}/klaim/status/${sep}`, {
+      headers: {
+        Authorization: `Bearer ${tokenStore.accessToken}`
+      }
+    })
+
+    if (response?.metadata?.code === 200 && response?.response?.data?.length > 0) {
+      const klaimData = response.response.data[0]
+
+      // Prioritize kemkes_dc_status first, then bpjs_dc_status
+      if (klaimData?.kemkes_dc_status === 'sent') {
+        status = 'sent'
+      } else if (klaimData?.bpjs_dc_status === 'sent') {
+        status = 'sent'
+      } else if (klaimData?.kemkes_dc_status === 'pending' || klaimData?.bpjs_dc_status === 'pending') {
+        status = 'pending'
+      }
+    }
+  } catch (error) {
+    // API failed, will use fallback methods
+  }
+
+  // If API fails, try to get status from rsia_klaim_idrg table
+  if (status === 'unsent' && row?.rsia_klaim_idrg) {
+    // Try send_klaim_res first (if it exists in future)
+    if (row.rsia_klaim_idrg.send_klaim_res) {
+      try {
+        const klaimResponse = typeof row.rsia_klaim_idrg.send_klaim_res === 'string'
+          ? JSON.parse(row.rsia_klaim_idrg.send_klaim_res)
+          : row.rsia_klaim_idrg.send_klaim_res
+
+        if (klaimResponse?.kemkes_dc_status === 'sent') {
+          status = 'sent'
+        } else if (klaimResponse?.bpjs_dc_status === 'sent') {
+          status = 'sent'
+        } else if (klaimResponse?.kemkes_dc_status === 'pending' || klaimResponse?.bpjs_dc_status === 'pending') {
+          status = 'pending'
+        }
+      } catch (error) {
+        // Error parsing send_klaim_res, continue to fallback
+      }
+    }
+
+    // If still unsent, check final_res for success indication
+    if (status === 'unsent' && row.rsia_klaim_idrg.final_res) {
+      try {
+        const finalResponse = typeof row.rsia_klaim_idrg.final_res === 'string'
+          ? JSON.parse(row.rsia_klaim_idrg.final_res)
+          : row.rsia_klaim_idrg.final_res
+
+        // If final_res shows success, assume sent
+        if (finalResponse?.metadata?.code === 200) {
+          status = 'sent'
+        }
+      } catch (error) {
+        // If final_res exists but can't parse, assume sent
+        status = row.rsia_klaim_idrg.final_res ? 'sent' : 'unsent'
+      }
+    }
+
+    // If still unsent, check set_claim_res for success indication
+    if (status === 'unsent' && row.rsia_klaim_idrg.set_claim_res) {
+      try {
+        const setResponse = typeof row.rsia_klaim_idrg.set_claim_res === 'string'
+          ? JSON.parse(row.rsia_klaim_idrg.set_claim_res)
+          : row.rsia_klaim_idrg.set_claim_res
+
+        // If set_claim_res shows success, assume sent
+        if (setResponse?.metadata?.code === 200) {
+          status = 'sent'
+        }
+      } catch (error) {
+        // If set_claim_res exists but can't parse, assume sent
+        status = row.rsia_klaim_idrg.set_claim_res ? 'sent' : 'unsent'
+      }
     }
   }
 
-  return 'unsent'
+  // Last fallback: check if SEP exists in inacbg_data_terkirim table
+  if (status === 'unsent') {
+    status = row?.inacbgDataTerkirim ? 'sent' : 'unsent'
+  }
+
+  // Cache the result
+  klaimStatusMap[sep] = status
+  delete klaimStatusMap[`${sep}_fetching`]
+  return status
 }
 
 async function fetchErmDetails(no_sep: string) {
@@ -4281,10 +6472,592 @@ function formatDate(date: string): string {
   })
 }
 
+// Helper functions for radiology section
+function parseRadiologyFindings(findings: string | any) {
+  if (!findings) return []
+
+  // Handle both string and object types
+  let content = ''
+  if (typeof findings === 'string') {
+    content = findings
+  } else if (findings && typeof findings === 'object') {
+    content = findings.hasil || findings.toString()
+  } else {
+    content = String(findings)
+  }
+
+  // Split by lines and filter out empty lines
+  const lines = content.split('\n').filter(line => line.trim())
+
+  return lines.map((line, index) => {
+    let type = 'normal'
+    let text = line.trim()
+
+    // Classify findings based on keywords
+    if (text.toLowerCase().includes('infiltrat') ||
+        text.toLowerCase().includes('opasitas') ||
+        text.toLowerCase().includes('pemadatan')) {
+      type = 'abnormal'
+    } else if (text.toLowerCase().includes('tak tampak') ||
+               text.toLowerCase().includes('normal') ||
+               text.toLowerCase().includes('intact')) {
+      type = 'normal'
+    } else if (text.toLowerCase().includes('tampak')) {
+      type = 'finding'
+    } else if (text.includes('-')) {
+      type = 'observation'
+    }
+
+    return { type, text, index }
+  })
+}
+
+function getFindingColor(type: string): string {
+  switch (type) {
+    case 'abnormal':
+      return 'bg-red-500'
+    case 'finding':
+      return 'bg-yellow-500'
+    case 'observation':
+      return 'bg-blue-500'
+    case 'normal':
+    default:
+      return 'bg-green-500'
+  }
+}
+
+function formatRadiologyText(text: string | any) {
+  if (!text) return ''
+
+  // Handle both string and object types
+  let content = ''
+  if (typeof text === 'string') {
+    content = text
+  } else if (text && typeof text === 'object') {
+    content = text.hasil || text.toString()
+  } else {
+    content = String(text)
+  }
+
+  // Convert plain text to formatted HTML with medical styling
+  let formatted = content
+    // Replace bullet points with styled bullets
+    .replace(/^- (.+)/g, '<li class="ml-4 mb-2">• $1</li>')
+    // Replace keywords with highlights
+    .replace(/\b(infiltrat|opasitas|pemadatan|air bronchogram|limfonodi|pneumonia|thymus)\b/gi,
+      '<span class="font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1 rounded">$1</span>')
+    // Replace anatomical terms
+    .replace(/\b(suprahillar|parahillar|hilus|diafragma|cor|thorax|pulmo|bilateral)\b/gi,
+      '<span class="font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1 rounded">$1</span>')
+    // Format kesan section
+    .replace(/(Kesan:)/g, '<span class="font-bold text-orange-600 dark:text-orange-400">$1</span>')
+    // Replace line breaks
+    .replace(/\n/g, '<br>')
+
+  // Wrap in list if bullet points detected
+  if (formatted.includes('<li')) {
+    formatted = '<ul class="list-disc space-y-1">' + formatted + '</ul>'
+  }
+
+  return formatted
+}
+
+function extractImpression(text: string | any) {
+  if (!text) return ''
+
+  // Handle array of radiology objects
+  let content = ''
+  if (Array.isArray(text)) {
+    // Get the first item's hasil_radiologi or concatenate all
+    if (text.length > 0 && text[0]?.hasil_radiologi?.hasil) {
+      content = text[0].hasil_radiologi.hasil
+    } else if (text.length > 0 && text[0]?.hasil) {
+      content = text[0].hasil
+    } else {
+      return 'Tidak ada kesan radiologi'
+    }
+  } else if (typeof text === 'string') {
+    content = text
+  } else if (text && typeof text === 'object') {
+    content = text.hasil || text.toString()
+  } else {
+    content = String(text)
+  }
+
+  // Extract "Kesan:" section from radiology text
+  const kesanMatch = content.match(/Kesan:\s*([\s\S]*?)(?=\n\n|$)/)
+  if (kesanMatch) {
+    return kesanMatch[1].trim()
+  }
+
+  // Alternative: look for conclusion patterns
+  const conclusionPatterns = [
+    /kesan[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+    /kesimpulan[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+    /conclusion[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+  ]
+
+  for (const pattern of conclusionPatterns) {
+    const match = content.match(pattern)
+    if (match) {
+      return match[1].trim()
+    }
+  }
+
+  return content.split('\n').slice(-3).join(' ').trim() // Last few lines as fallback
+}
+
+function extractConclusionFromText(textArray: string[]): string {
+  if (!textArray || textArray.length === 0) return ''
+
+  // Join the array into a single string for processing
+  const fullText = textArray.join('\n')
+
+  // Use the same logic as extractImpression but work with the joined text
+  let content = fullText
+
+  // Extract "Kesan:" section from radiology text
+  const kesanMatch = content.match(/Kesan:\s*([\s\S]*?)(?=\n\n|$)/)
+  if (kesanMatch) {
+    return kesanMatch[1].trim()
+  }
+
+  // Alternative: look for conclusion patterns
+  const conclusionPatterns = [
+    /kesan[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+    /kesimpulan[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+    /conclusion[:\s]*([\s\S]*?)(?=\n\n|$)/i,
+  ]
+
+  for (const pattern of conclusionPatterns) {
+    const match = content.match(pattern)
+    if (match) {
+      return match[1].trim()
+    }
+  }
+
+  // Fallback: return the first line or a short excerpt
+  return content.split('\n')[0].trim() || 'Impressi radiologi'
+}
+
+function getLineType(line: string): string {
+  if (!line) return 'normal'
+
+  const lowerLine = line.toLowerCase().trim()
+
+  // Classify findings based on keywords
+  if (lowerLine.includes('infiltrat') ||
+      lowerLine.includes('opasitas') ||
+      lowerLine.includes('pemadatan')) {
+    return 'abnormal'
+  } else if (lowerLine.includes('tak tampak') ||
+             lowerLine.includes('normal') ||
+             lowerLine.includes('intact') ||
+             lowerLine.includes('tidak tampak')) {
+    return 'normal'
+  } else if (lowerLine.includes('tampak') ||
+             lowerLine.includes('terlihat') ||
+             lowerLine.includes('terlihat')) {
+    return 'finding'
+  } else if (lowerLine.includes('-')) {
+    return 'observation'
+  }
+
+  return 'finding'
+}
+
+function getRadiologyText(text: string | any): string[] {
+  if (!text) return []
+
+  let content = ''
+
+  // Handle array of radiology objects
+  if (Array.isArray(text)) {
+    // Get the first item's hasil_radiologi or concatenate all
+    if (text.length > 0 && text[0]?.hasil_radiologi?.hasil) {
+      content = text[0].hasil_radiologi.hasil
+    } else if (text.length > 0 && text[0]?.hasil) {
+      content = text[0].hasil
+    } else {
+      return ['Data radiologi tidak tersedia']
+    }
+  } else if (typeof text === 'string') {
+    content = text
+  } else if (text && typeof text === 'object') {
+    content = text.hasil || text.toString()
+  } else {
+    content = String(text)
+  }
+
+  // Split by lines and filter out empty lines
+  return content.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+}
+
+function copyRadiologyResults() {
+  try {
+    const text = visitDetails.value?.radiologi || ''
+    if (typeof text === 'object' && text.hasil) {
+      navigator.clipboard.writeText(text.hasil)
+    } else if (typeof text === 'string') {
+      navigator.clipboard.writeText(text)
+    }
+    // You could show a toast notification here
+    console.log('Radiology results copied to clipboard')
+  } catch (error) {
+    console.error('Failed to copy radiology results:', error)
+  }
+}
+
+function printRadiologyResults() {
+  try {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    const text = visitDetails.value?.radiologi || ''
+    let content = ''
+
+    if (typeof text === 'object' && text.hasil) {
+      content = text.hasil
+    } else if (typeof text === 'string') {
+      content = text
+    }
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Hasil Radiologi</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+            h1 { color: #333; }
+            pre { white-space: pre-wrap; }
+          </style>
+        </head>
+        <body>
+          <h1>Hasil Pemeriksaan Radiologi</h1>
+          <p><strong>Tanggal:</strong> ${formatDate(visitDetails.value?.tgl_kunjungan || '')}</p>
+          <p><strong>Pasien:</strong> ${visitDetails.value?.nm_pasien || 'N/A'}</p>
+          <p><strong>No. RM:</strong> ${visitDetails.value?.no_rkm_medis || 'N/A'}</p>
+          <hr>
+          <pre>${content}</pre>
+        </body>
+      </html>
+    `)
+
+    printWindow.document.close()
+    printWindow.print()
+  } catch (error) {
+    console.error('Failed to print radiology results:', error)
+  }
+}
+
+function openImagePreview(imageUrl: string, title: string = 'Gambar Radiologi') {
+  try {
+    // Create modal overlay
+    const modal = document.createElement('div')
+    modal.id = 'image-preview-modal'
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in'
+
+    // Create modal content with better initial size
+    const modalContent = document.createElement('div')
+    modalContent.className = 'relative w-[90vw] h-[85vh] max-w-6xl mx-4 bg-white dark:bg-gray-800 rounded-xl shadow-2xl overflow-hidden flex flex-col'
+
+    // Create header with zoom controls
+    const header = document.createElement('div')
+    header.className = 'flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 flex-shrink-0'
+    header.innerHTML = `
+      <div class="flex items-center gap-4">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100">${title}</h3>
+        <div class="flex items-center gap-2">
+          <button id="open-new-tab" class="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-1 hover:bg-green-600 active:scale-95" title="Buka gambar asli di tab baru (Ctrl+O)">
+            <i class="i-tabler-external-link"></i>
+            <span class="hidden sm:inline">Buka Asli</span>
+          </button>
+          <button id="zoom-in" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm font-medium transition-colors" title="Zoom in (+)">
+            <i class="i-tabler-zoom-in"></i>
+          </button>
+          <button id="zoom-out" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-sm font-medium transition-colors" title="Zoom out (-)">
+            <i class="i-tabler-zoom-out"></i>
+          </button>
+          <button id="zoom-reset" class="px-3 py-1.5 bg-gray-400 hover:bg-gray-500 text-white rounded-md text-sm font-medium transition-colors" title="Reset zoom (0)">
+            <i class="i-tabler-zoom-reset"></i>
+          </button>
+          <span class="text-sm text-gray-600 dark:text-gray-400" id="zoom-level">100%</span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('image-preview-modal')?.remove()"
+              class="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 flex items-center justify-center transition-colors">
+        <i class="i-tabler-x text-gray-600 dark:text-gray-400"></i>
+      </button>
+    `
+
+    // Create image container with proper scrolling for original size
+    const imageContainer = document.createElement('div')
+    imageContainer.className = 'flex-1 overflow-auto relative bg-gray-100 dark:bg-gray-900 p-4'
+
+    // Create container for original size image (no auto-scaling)
+    const imageWrapper = document.createElement('div')
+    imageWrapper.className = 'inline-block relative'
+    imageWrapper.style.minWidth = 'min-content'
+    imageWrapper.style.minHeight = 'min-content'
+    imageWrapper.style.transformOrigin = 'center center'
+    imageWrapper.style.transition = 'transform 0.2s ease-out'
+
+    // Create image with original size
+    const img = document.createElement('img')
+    img.src = imageUrl
+    img.alt = title
+    img.className = 'block'  // Remove size constraints to show original size
+    img.style.cursor = 'grab'
+    img.style.userSelect = 'none'
+    img.draggable = false
+    img.style.width = 'auto'    // Use original width
+    img.style.height = 'auto'   // Use original height
+
+    // Zoom state
+    let zoomLevel = 1
+    let isDragging = false
+    let startX = 0
+    let startY = 0
+    let scrollLeft = 0
+    let scrollTop = 0
+
+    // Zoom functions
+    const updateZoom = () => {
+      const zoomPercent = Math.round(zoomLevel * 100)
+      document.getElementById('zoom-level').textContent = `${zoomPercent}%`
+      imageWrapper.style.transform = `scale(${zoomLevel})`
+      imageWrapper.style.transformOrigin = 'top left'
+    }
+
+    const zoomIn = () => {
+      if (zoomLevel < 3) {
+        zoomLevel = Math.min(zoomLevel + 0.25, 3)
+        updateZoom()
+      }
+    }
+
+    const zoomOut = () => {
+      if (zoomLevel > 0.5) {
+        zoomLevel = Math.max(zoomLevel - 0.25, 0.5)
+        updateZoom()
+      }
+    }
+
+    const resetZoom = () => {
+      zoomLevel = 1
+      imageWrapper.style.transform = `scale(1)`
+      imageContainer.scrollLeft = 0
+      imageContainer.scrollTop = 0
+      updateZoom()
+    }
+
+    // Add image load and error handlers
+    img.onload = () => {
+      // Hide loading indicator
+      const loadingEl = imageContainer.querySelector('.loading-indicator')
+      if (loadingEl) {
+        loadingEl.remove()
+      }
+
+      // Reset zoom to 1 and ensure proper fit on load
+      zoomLevel = 1
+      imageWrapper.style.transform = `scale(1)`
+      imageContainer.scrollLeft = 0
+      imageContainer.scrollTop = 0
+      updateZoom()
+    }
+
+    img.onerror = () => {
+      imageContainer.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+          <div class="text-center">
+            <i class="i-tabler-photo-off text-6xl mb-4"></i>
+            <p class="text-lg font-medium mb-2">Gambar tidak dapat dimuat</p>
+            <p class="text-sm text-gray-400 dark:text-gray-500 break-all">${imageUrl}</p>
+          </div>
+        </div>
+      `
+    }
+
+    // Mouse wheel zoom
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      if (e.deltaY < 0) {
+        zoomIn()
+      } else {
+        zoomOut()
+      }
+    }
+
+    // Drag to pan
+    const startDrag = (e: MouseEvent) => {
+      isDragging = true
+      startX = e.pageX - imageContainer.scrollLeft
+      startY = e.pageY - imageContainer.scrollTop
+      img.style.cursor = 'grabbing'
+    }
+
+    const drag = (e: MouseEvent) => {
+      if (!isDragging) return
+      e.preventDefault()
+      const x = e.pageX - startX
+      const y = e.pageY - startY
+      imageContainer.scrollLeft = scrollLeft - x
+      imageContainer.scrollTop = scrollTop - y
+    }
+
+    const endDrag = () => {
+      isDragging = false
+      img.style.cursor = 'grab'
+      scrollLeft = imageContainer.scrollLeft
+      scrollTop = imageContainer.scrollTop
+    }
+
+    // Add loading indicator
+    imageContainer.innerHTML = `
+      <div class="loading-indicator flex items-center justify-center">
+        <div class="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    `
+
+    // Assemble modal
+    imageWrapper.appendChild(img)
+
+    // Add keyboard shortcuts helper
+    const shortcutsInfo = document.createElement('div')
+    shortcutsInfo.className = 'text-xs text-gray-500 dark:text-gray-400 mt-3 text-center border-t border-gray-200 dark:border-gray-700 pt-2'
+    shortcutsInfo.innerHTML = `
+      <span class="font-medium">Keyboard Shortcuts:</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Ctrl+O</kbd> Buka Asli</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">+/-</kbd> Zoom</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">0</kbd> Reset</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd> Tutup</span>
+    `
+
+    imageContainer.appendChild(imageWrapper)
+    imageContainer.appendChild(shortcutsInfo)
+    modalContent.appendChild(header)
+    modalContent.appendChild(imageContainer)
+    modal.appendChild(modalContent)
+
+    // Add to DOM first
+    document.body.appendChild(modal)
+
+    // Add event listeners after DOM is ready
+    setTimeout(() => {
+      imageContainer.addEventListener('wheel', handleWheel, { passive: false })
+      img.addEventListener('mousedown', startDrag)
+      document.addEventListener('mousemove', drag)
+      document.addEventListener('mouseup', endDrag)
+      document.addEventListener('mouseleave', endDrag)
+
+      // Button event listeners
+      const zoomInBtn = document.getElementById('zoom-in')
+      const zoomOutBtn = document.getElementById('zoom-out')
+      const resetBtn = document.getElementById('zoom-reset')
+      const openNewTabBtn = document.getElementById('open-new-tab')
+
+      if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn)
+      if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut)
+      if (resetBtn) resetBtn.addEventListener('click', resetZoom)
+
+      // Open image in new tab
+      if (openNewTabBtn) {
+        openNewTabBtn.addEventListener('click', () => {
+          window.open(imageUrl, '_blank')
+        })
+      }
+    }, 100)
+
+    // Add loading indicator
+    imageContainer.innerHTML = `
+      <div class="loading-indicator flex items-center justify-center">
+        <div class="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+      </div>
+    `
+
+    // Assemble modal
+    imageWrapper.appendChild(img)
+
+    // Add keyboard shortcuts helper
+   
+    shortcutsInfo.className = 'text-xs text-gray-500 dark:text-gray-400 mt-3 text-center border-t border-gray-200 dark:border-gray-700 pt-2'
+    shortcutsInfo.innerHTML = `
+      <span class="font-medium">Keyboard Shortcuts:</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Ctrl+O</kbd> Buka Asli</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">+/-</kbd> Zoom</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">0</kbd> Reset</span>
+      <span class="mx-2">•</span>
+      <span><kbd class="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">Esc</kbd> Tutup</span>
+    `
+
+    imageContainer.appendChild(imageWrapper)
+    imageContainer.appendChild(shortcutsInfo)
+    modalContent.appendChild(header)
+    modalContent.appendChild(imageContainer)
+    modal.appendChild(modalContent)
+
+    // Add to DOM
+    document.body.appendChild(modal)
+
+    // Close on escape key and handle shortcuts
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Cleanup event listeners
+        imageContainer.removeEventListener('wheel', handleWheel)
+        img.removeEventListener('mousedown', startDrag)
+        document.removeEventListener('mousemove', drag)
+        document.removeEventListener('mouseup', endDrag)
+        document.removeEventListener('mouseleave', endDrag)
+        modal.remove()
+        document.removeEventListener('keydown', handleEscape)
+      } else if (e.ctrlKey && e.key === 'o') {
+        // Ctrl+O to open original image
+        e.preventDefault()
+        window.open(imageUrl, '_blank')
+      } else if (e.key === '+' || e.key === '=') {
+        // Plus key to zoom in
+        e.preventDefault()
+        zoomIn()
+      } else if (e.key === '-' || e.key === '_') {
+        // Minus key to zoom out
+        e.preventDefault()
+        zoomOut()
+      } else if (e.key === '0') {
+        // Zero key to reset zoom
+        e.preventDefault()
+        resetZoom()
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+
+    // Close on background click
+    modal.addEventListener('click', (e: MouseEvent) => {
+      if (e.target === modal) {
+        modal.remove()
+        document.removeEventListener('keydown', handleEscape)
+      }
+    })
+
+    console.log(`Opening image preview: ${title}`)
+  } catch (error) {
+    console.error('Failed to open image preview:', error)
+  }
+}
+
 // ========================================
 // BILLING METHODS
 // ========================================
-async function loadProcedureBilling() {
+async function loadProcedureBillingInternal() {
   console.log('loadProcedureBilling called, selectedVisitData:', selectedVisitData.value)
   if (!selectedVisitData.value?.no_rawat) {
     console.log('No no_rawat found in selectedVisitData')
@@ -4327,6 +7100,7 @@ async function loadProcedureBilling() {
     })
 
     console.log('Summary response:', summaryResponse)
+
     billingSummary.value = summaryResponse.data || {
       total_procedures: 0,
       total_biaya: 0,
@@ -4343,7 +7117,7 @@ async function loadProcedureBilling() {
       }
     })
 
-    topProcedures.value = topProceduresResponse.data || []
+    topProcedures.value = topProceduresResponse.data?.data || []
 
   } catch (error) {
     console.error('Error loading procedure billing:', error)
@@ -4535,53 +7309,106 @@ async function saveProcedureMapping() {
 
 // Load procedure mapping data for billing display
 async function loadProcedureMappings() {
-  if (!procedureBilling.value || procedureBilling.value.length === 0) return
+  if (!procedureBilling.value || procedureBilling.value.length === 0) {
+    console.log('⚠️ loadProcedureMappings: No procedure billing data available')
+    return
+  }
+
+  console.log('🔍 loadProcedureMappings: Starting to load SNOMED mappings')
+  console.log('📊 Available procedures:', procedureBilling.value.length)
+
+  // Check if current patient is rawat inap
+  const isRawatInap = selectedVisitData.value?.jnspelayanan === '1' ||
+                      selectedVisitData.value?.jnspelayanan === 'Ranap' ||
+                      (selectedVisitData.value?.jnspelayanan && selectedVisitData.value.jnspelayanan.includes('Ranap'))
 
   try {
     const kdJenisPrws = procedureBilling.value.map((p: any) => p.kd_jenis_prw)
+    console.log('🔑 Procedure codes to fetch mappings for:', kdJenisPrws)
+    console.log('🏥 Is Rawat Inap:', isRawatInap)
 
-    // Get existing mappings
+    // Get existing mappings - use different endpoint for rawat inap
     const mappingPromises = kdJenisPrws.map(async (kdJenisPrw: string) => {
       try {
-        const response = await $fetch(`${config.public.API_V2_URL}/procedure-mapping/${kdJenisPrw}`, {
+        console.log(`🔎 Fetching mapping for procedure: ${kdJenisPrw}`)
+
+        // Use different endpoint for rawat inap vs rawat jalan
+        const endpoint = isRawatInap
+          ? `${config.public.API_V2_URL}/procedure-mapping/${kdJenisPrw}?type=inap`
+          : `${config.public.API_V2_URL}/procedure-mapping/${kdJenisPrw}`
+
+        console.log(`🌐 Using endpoint: ${endpoint}`)
+
+        const response = await $fetch(endpoint, {
           headers: {
             'Authorization': `Bearer ${tokenStore.accessToken}`,
-            'Content-Type': 'application/json'
+            'Accept': 'application/json'
           }
         })
-        return { kdJenisPrw, mapping: response.data }
+
+        console.log(`📡 Raw response for ${kdJenisPrw}:`, response)
+
+        // $fetch returns data directly, not a Response object
+        if (response && typeof response === 'object' && 'data' in response) {
+          console.log(`✅ Found mapping for ${kdJenisPrw}:`, response.data)
+          return { kdJenisPrw, mapping: response.data }
+        } else if (response === null || response === undefined) {
+          console.log(`❌ No mapping found for ${kdJenisPrw}`)
+          return { kdJenisPrw, mapping: null }
+        } else {
+          console.log(`✅ Found mapping for ${kdJenisPrw}:`, response)
+          return { kdJenisPrw, mapping: response }
+        }
       } catch (error: any) {
         // Handle 404 errors (mapping not found) and other errors gracefully
-        console.log(`No mapping found for procedure ${kdJenisPrw}:`, error?.data?.message || error?.message || 'Not found')
+        console.log(`❌ No mapping found for procedure ${kdJenisPrw}:`, error?.data?.message || error?.message || 'Not found')
         return { kdJenisPrw, mapping: null }
       }
     })
 
     const mappings = await Promise.all(mappingPromises)
+    console.log('📋 All mappings loaded:', mappings)
 
     // Merge mapping data into procedure billing
-    procedureBilling.value = procedureBilling.value.map((procedure: any) => {
+    const updatedBilling = procedureBilling.value.map((procedure: any) => {
       const mappingData = mappings.find(m => m.kdJenisPrw === procedure.kd_jenis_prw)
-      return {
+      const updated = {
         ...procedure,
         snomed_mapping: mappingData?.mapping || null
       }
+
+      // Enhanced debugging for RI00122 (Nebulizer)
+      if (procedure.kd_jenis_prw === 'RI00122') {
+        console.log(`🔍 DEBUG for RI00122:`, {
+          procedure: procedure,
+          mappingData: mappingData,
+          mappingData_mapping: mappingData?.mapping,
+          hasSnomedMapping_result: hasSnomedMapping(updated),
+          snomed_mapping_field: updated.snomed_mapping,
+          updated_procedure: updated
+        })
+      }
+
+      console.log(`🔄 Updating procedure ${procedure.kd_jenis_prw} with mapping:`, updated.snomed_mapping)
+      return updated
     })
 
+    procedureBilling.value = updatedBilling
+    console.log('✅ Procedure billing updated with SNOMED mappings:', procedureBilling.value)
+
   } catch (error) {
-    console.error('Error loading procedure mappings:', error)
+    console.error('💥 Error loading procedure mappings:', error)
   }
 }
 
-// Update loadProcedureBilling to also load mappings
-const originalLoadProcedureBilling = loadProcedureBilling
-async function loadProcedureBillingWithMappings() {
-  await originalLoadProcedureBilling()
+// Create the public loadProcedureBilling function that includes mappings
+async function loadProcedureBilling() {
+  console.log('🔄 loadProcedureBilling called - will load billing + SNOMED mappings')
+  await loadProcedureBillingInternal()
+  console.log('📊 Billing data loaded, now loading SNOMED mappings...')
   await loadProcedureMappings()
+  console.log('✅ loadProcedureBilling completed with SNOMED mappings')
 }
-
-// Replace the original function reference
-loadProcedureBilling = loadProcedureBillingWithMappings
 
 // ========================================
 // BPJS SUBMISSION METHODS
@@ -4732,12 +7559,15 @@ async function sendToBpjs() {
     // 5. Send to BPJS API with proper wrapper payload
     const currentDate = new Date()
 
+    // Use SEP date for month and year calculation
+    const sepDate = selectedVisitData.value?.tglsep ? new Date(selectedVisitData.value.tglsep) : currentDate
+
     const payload = {
       request: {
         noSep: validSep,
         jnsPelayanan: (selectedVisitData.value?.jnspelayanan === 'Ralan' || selectedVisitData.value?.jnspelayanan === '2' || visitDetails.value?.reg_periksa?.jnspelayanan === 'Ralan' || visitDetails.value?.reg_periksa?.jnspelayanan === '2' || visitDetails.value?.sep?.jnsPelayanan === '2') ? '2' : '1', // 1=Rawat Inap, 2=Rawat Jalan
-        bulan: String(currentDate.getMonth() + 1).padStart(2, '0'),
-        tahun: String(currentDate.getFullYear()),
+        bulan: String(sepDate.getMonth() + 1).padStart(2, '0'),
+        tahun: String(sepDate.getFullYear()),
         dataMR: medicalRecordBundle  // Send as object (backend will handle encryption/compression)
       }
     }
@@ -4861,6 +7691,48 @@ async function sendToBpjs() {
         // Real success case
         showBpjsSuccessToast('Data berhasil dikirim ke BPJS')
         bpjsSubmissionStatus.value = 'success'
+
+        // Auto-refresh ERM BPJS status after successful submission
+        const currentSep = selectedVisitData.value?.no_sep || visitDetails.value?.sep?.noSep || ''
+        if (currentSep) {
+          console.log('🔄 Auto-refreshing ERM BPJS status for SEP:', currentSep)
+
+          // Clear cache for current SEP to force refresh
+          clearCache(currentSep)
+
+          // Optional: Re-check all SEPs in current data to ensure status is up-to-date
+          if (props.data?.data && Array.isArray(props.data.data)) {
+            const sepList = props.data.data
+              .map((row: any) => row.no_sep)
+              .filter(Boolean)
+
+            // Clear cache for all SEPs to ensure fresh data
+            sepList.forEach(sep => clearCache(sep))
+
+            if (sepList.length > 0) {
+              // Re-check ERM status for all SEPs after a short delay to allow backend to update
+              setTimeout(async () => {
+                try {
+                  console.log('🔄 Checking ERM BPJS status for SEPs:', sepList)
+                  const results = await checkMultipleErmStatus(sepList)
+                  const newStatus: Record<string, boolean> = {}
+                  results.forEach((status, noSep) => {
+                    newStatus[noSep] = status
+                  })
+                  ermBpjsStatus.value = { ...ermBpjsStatus.value, ...newStatus }
+                  console.log('✅ ERM BPJS status refreshed for all SEPs:', newStatus)
+
+                  // Show success message if current SEP status is true
+                  if (newStatus[currentSep]) {
+                    console.log('🎉 ERM BPJS badge should now be visible for SEP:', currentSep)
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to refresh ERM BPJS status:', error)
+                }
+              }, 1500) // Wait 1.5 seconds for backend to update
+            }
+          }
+        }
       } else {
         // Show BPJS error response with full details
         const bpjsResponseText = response?.bpjs_response
@@ -5407,7 +8279,7 @@ async function generateFhirBundle() {
               },
               "text": {
                 "status": "additional",
-                "div": `<div xmlns="http://www.w3.org/1999/xhtml">${data.keluhan || 'Tidak ada keluhan khusus'}</div>`
+                "div": `<div xmlns="http://www.w3.org/1999/xhtml">${reasonForAdmission || (codingDetail.value?.existing_coding?.clinical_notes_snomed?.[0]?.source_text || 'Tidak ada keluhan khusus')}</div>`
               },
               "entry": [{
                 "reference": `Encounter/${encounterId}`
@@ -6226,6 +9098,37 @@ async function generateMinimalBPJSBundle() {
 }
 
 
+// Helper function to check if a procedure row has SNOMED mapping
+function hasSnomedMapping(row: any): boolean {
+  if (!row || !row.snomed_mapping) return false
+
+  // Check if snomed_mapping exists and has required fields
+  return !!(
+    row.snomed_mapping?.snomed_concept_id ||
+    row.snomed_mapping?.code ||
+    row.snomed_mapping?.snomed_term ||
+    row.snomed_mapping?.display ||
+    (row.snomed_mapping?.snomed && row.snomed_mapping.snomed.code)
+  )
+}
+
+// Helper function to get SNOMED code from mapping
+function getSnomedCode(row: any): string {
+  return row.snomed_mapping?.snomed_concept_id ||
+         row.snomed_mapping?.code ||
+         row.snomed_mapping?.snomed?.code ||
+         'N/A'
+}
+
+// Helper function to get SNOMED display term from mapping
+function getSnomedDisplay(row: any): string {
+  return row.snomed_mapping?.snomed_term ||
+         row.snomed_mapping?.display ||
+         row.snomed_mapping?.snomed_fsn ||
+         row.snomed_mapping?.snomed?.display ||
+         'N/A'
+}
+
 // Helper function to parse lab results text
 function parseLabResults(labResultsText: string): any[] {
   const results: any[] = []
@@ -6448,7 +9351,10 @@ async function generateBPJSMedicalRecordBundle() {
           coding: [{ system: "http://terminology.hl7.org/CodeSystem/v3-MaritalStatus", code: data.stts_nikah?.toUpperCase().includes('NIKAH') ? "M" : "U", display: data.stts_nikah }],
           text: data.stts_nikah || null
       },
-      managingOrganization: { reference: `Organization/${organizationId}`, display: namaRumahSakit }
+      managingOrganization: {
+        reference: `Organization/${organizationId}`,
+        display: namaRumahSakit
+      }
     };
     finalEntries.push({ resource: patientResource });
 
@@ -6456,11 +9362,11 @@ async function generateBPJSMedicalRecordBundle() {
     const organizations = [
       {
         name: namaRumahSakit,
-        id: `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`
+        id: organizationId
       }
     ];
 
-    organizations.forEach(org => {
+      organizations.forEach(org => {
       const organizationResource = {
         resourceType: 'Organization',
         id: org.id,
@@ -6602,7 +9508,7 @@ async function generateBPJSMedicalRecordBundle() {
       visitDetails.value.diagnosa.forEach((diag) => {
         if (!diag.kode) return;
         const condId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        
+
         const condition = {
           resourceType: 'Condition',
           id: condId,
@@ -6629,93 +9535,284 @@ async function generateBPJSMedicalRecordBundle() {
       });
     }
 
-    // --- 5. MEDICATION REQUEST (Obat) ---
-    const obatList = (resepObat.value && resepObat.value.length > 0)
-        ? resepObat.value.flatMap(r => r.detail || [])
-        : (visitDetails.value?.obat || []);
+    // --- 4.1. CONDITION (Prosedur ICD-9) ---
+    if (visitDetails.value?.prosedur && Array.isArray(visitDetails.value.prosedur)) {
+      visitDetails.value.prosedur.forEach((proc) => {
+        if (!proc.kode) return;
+        const procCondId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
 
-    if (obatList.length > 0) {
-      obatList.forEach(obat => {
-        const medId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const medName = obat.obat?.nama_brng || obat.nama_brng || 'Obat';
-        const medCode = obat.kode_brng || '000';
-        const aturan = obat.aturan_pakai?.aturan || '1x1';
-        const jumlah = obat.jml || 1;
-        const satuan = obat.obat?.kode_sat || 'TAB';
-
-        const medRequest = {
-          resourceType: 'MedicationRequest',
-          id: medId,
-          text: {
-            "div": medName
-          },
-          identifier: {
-            "system": "id_resep_pulang",
-            "value": medId
-          },
-          subject: {
-            "display": data.nm_pasien,
-            "reference": `Patient/${patientId}`
-          },
-          intent: "final",
-          medicationCodeableConcept: {
-            "coding": [
-              {
-                "system": "https://rsiaaisyiyah.com/drug",
-                "code": medCode
-              }
-            ],
-            "text": medName
-          },
-          dosageInstruction: [{
-            "doseQuantity": {
-              "code": satuan,
-              "system": "http://unitsofmeasure.org",
-              "unit": satuan,
-              "value": jumlah
-            },
-            "route": {
+        const procCondition = {
+          resourceType: 'Condition',
+          id: procCondId,
+          clinicalStatus: 'active',
+          verificationStatus: 'confirmed',
+          category: [
+            {
               "coding": [
                 {
-                  "system": "http://snomed.info/sct",
-                  "code": "001",
-                  "display": "ORAL"
+                  "system": "http://hl7.org/fhir/condition-category",
+                  "code": "procedure",
+                  "display": "Procedure"
                 }
-              ]
-            },
-            "timing": {
-              "repeat": { "frequency": "1", "period": "1", "periodUnit": "d" }
-            },
-            "additionalInstruction": [
-                {
-                  "text": "Tidak Ada"
-                }
-              ]
-          }],
-          reasonCode: [
-            {
-              "coding": [{ "system": "", "code": "", "display": "" }],
-              "text": ""
+              ],
+              "text": "Prosedur"
             }
           ],
-          requester: {
-            agent: {
-              display: practitionerName,
-              reference: `Practitioner/${practitionerId}`
-            },
-            onBehalfOf: {
-              reference: `Organization/${organizationId}`
-            }
+          code: {
+            coding: [
+              { system: 'http://hl7.org/fhir/sid/icd-9-cm', code: proc.kode, display: proc.deskripsi }
+            ],
+            text: proc.deskripsi
           },
-          "meta": { "lastUpdated": endTime }
+          subject: { reference: `Patient/${patientId}` },
+          onsetDateTime: startTime
         };
-        medicationsList.push(medRequest);
-        medicationRefs.push({ reference: `MedicationRequest/${medId}` });
+        finalEntries.push({ resource: procCondition });
+        diagnosisRefs.push({ reference: `Condition/${procCondId}` });
       });
-      // Add all medications as ONE entry with array structure
-      if (medicationsList.length > 0) {
-        finalEntries.push({ resource: medicationsList });
-      }
+    }
+
+    // --- 5. MEDICATION REQUEST (Obat) ---
+    // Use resepObat directly since it's already set from API response
+    const obatList = resepObat.value || visitDetails.value?.obat || [];
+
+    // Process medications for both rawat jalan and rawat inap
+    if (obatList.length > 0) {
+      // Group medications by prescription for better organization
+      const medicationGroups = new Map();
+
+      obatList.forEach(obat => {
+        const groupKey = obat.tipe_rawatan === 'Rawat Inap'
+          ? `${obat.tgl_peresepan}-${obat.jam_peresepan}` // Group by date/time for discharge meds
+          : `${obat.no_resep || 'unknown'}-${obat.tgl_peresepan}`; // Group by prescription number
+
+        if (!medicationGroups.has(groupKey)) {
+          medicationGroups.set(groupKey, {
+            medications: [],
+            tipe_rawatan: obat.tipe_rawatan,
+            no_resep: obat.no_resep,
+            tgl_peresepan: obat.tgl_peresepan,
+            jam_peresepan: obat.jam_peresepan,
+            dokter_nama: obat.dokter_nama || 'Dokter',
+            status_resep: obat.status_resep
+          });
+        }
+        medicationGroups.get(groupKey).medications.push(obat);
+      });
+
+      // Create MedicationRequest for each group
+      medicationGroups.forEach((group, groupKey) => {
+        group.medications.forEach((obat, index) => {
+          const medId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
+          const medName = obat.display_nama_brng || obat.nama_brng || 'Obat';
+          // For racikan, use RACIKAN-X format; for non-racikan, use kode_brng
+          const medCode = (obat.status_resep === 'Racik' && obat.kode_brng && obat.kode_brng.startsWith('RACIKAN-')) ?
+            obat.kode_brng :
+            (obat.kode_brng || '000');
+          const jumlah = obat.jml || 1;
+          const satuan = obat.kode_sat || 'TAB';
+          const isRawatInap = obat.tipe_rawatan === 'Rawat Inap';
+
+          // Determine intent based on treatment type
+          const intent = isRawatInap ? 'discharge' : 'order';
+
+          // Determine status based on treatment type and prescription status
+          let status = 'active';
+          if (!isRawatInap && group.status_resep === 'Batal') {
+            status = 'cancelled';
+          } else if (!isRawatInap && group.status_resep === 'Selesai') {
+            status = 'completed';
+          } else if (isRawatInap) {
+            status = 'active'; // Default for discharge medications
+          }
+
+          const medRequest = {
+            resourceType: 'MedicationRequest',
+            id: medId,
+            text: {
+              "div": `${medName} (${isRawatInap ? 'Resep Pulang' : 'Resep Rawat Jalan'})`
+            },
+            status: status,
+            intent: intent,
+            identifier: {
+              "system": isRawatInap ? "id_resep_pulang" : "id_resep_obat",
+              "value": group.no_resep || `${groupKey}-${index + 1}`
+            },
+            authoredOn: group.tgl_peresepan ? `${group.tgl_peresepan}T${group.jam_peresepan || '00:00:00'}` : new Date().toISOString(),
+            subject: {
+              "display": data.nm_pasien,
+              "reference": `Patient/${patientId}`
+            },
+            encounter: {
+              "reference": `Encounter/${encounterId}`
+            },
+            medicationCodeableConcept: {
+              "coding": [
+                {
+                  "system": "https://rsiaaisyiyah.com/drug",
+                  "code": medCode,
+                  "display": medName
+                }
+              ],
+              "text": medName
+            },
+            dosageInstruction: [{
+              text: isRawatInap ? "Obat pulang sesuai kebutuhan" : "Dosis sesuai kebutuhan",
+              "doseQuantity": {
+                "code": satuan,
+                "system": "http://unitsofmeasure.org",
+                "unit": satuan,
+                "value": jumlah
+              },
+              "route": {
+                "coding": [
+                  {
+                    "system": "http://snomed.info/sct",
+                    "code": getRouteCode(medName),
+                    "display": getRouteDisplay(medName)
+                  }
+                ],
+                "text": getRouteDisplay(medName)
+              },
+              "timing": {
+                "repeat": {
+                  "frequency": getDosageFrequency(medName),
+                  "period": "1",
+                  "periodUnit": "d"
+                }
+              },
+              "additionalInstruction": [
+                {
+                  "text": getAdditionalInstruction(obat)
+                }
+              ]
+            }],
+            reasonCode: [
+              {
+                "coding": [{
+                  "system": "http://snomed.info/sct",
+                  "code": "160244002",
+                  "display": isRawatInap ? "Discharge medication" : "Outpatient medication"
+                }],
+                "text": isRawatInap ? "Obat pulang pasien rawat inap" : "Obat untuk pasien rawat jalan"
+              }
+            ],
+            requester: {
+              agent: {
+                display: group.dokter_nama || practitionerName,
+                reference: `Practitioner/${practitionerId}`
+              },
+              onBehalfOf: {
+                reference: `Organization/${organizationId}`
+              }
+            },
+            "meta": { "lastUpdated": endTime },
+            "note": isRawatInap ? [
+              {
+                "text": "Resep pulang untuk pasien rawat inap"
+              }
+            ] : []
+          };
+          medicationsList.push(medRequest);
+          medicationRefs.push({ reference: `MedicationRequest/${medId}` });
+        });
+      });
+    } else {
+      // Jika tidak ada data obat, buat MedicationRequest default dengan placeholder
+      const defaultMedId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
+
+      const defaultMedRequest = {
+        resourceType: 'MedicationRequest',
+        id: defaultMedId,
+        text: {
+          "div": "Tidak Ada Obat"
+        },
+        identifier: {
+          "system": "id_resep_pulang",
+          "value": defaultMedId
+        },
+        subject: {
+          "display": data.nm_pasien,
+          "reference": `Patient/${patientId}`
+        },
+        intent: "final",
+        status: "completed",
+        medicationCodeableConcept: {
+          "coding": [
+            {
+              "system": "https://rsiaaisyiyah.com/drug",
+              "code": "000",
+              "display": "Tidak Ada Obat"
+            }
+          ],
+          "text": "Tidak Ada Obat"
+        },
+        dosageInstruction: [{
+          "doseQuantity": {
+            "code": "",
+            "system": "",
+            "unit": "",
+            "value": 0
+          },
+          "route": {
+            "coding": [
+              {
+                "system": "",
+                "code": "",
+                "display": ""
+              }
+            ],
+            "text": ""
+          },
+          "timing": {
+              "repeat": {
+                "frequency": "0",
+                "period": "1",
+                "periodUnit": "d"
+              }
+          },
+          "additionalInstruction": [
+            {
+              "text": "Tidak Ada Obat Diresepkan"
+            }
+          ]
+        }],
+        reasonCode: [
+          {
+            "coding": [{
+              "system": "",
+              "code": "",
+              "display": ""
+            }],
+            "text": "Tidak Ada Indikasi Khusus"
+          }
+        ],
+        requester: {
+          agent: {
+            display: practitionerName,
+            reference: `Practitioner/${practitionerId}`
+          },
+          onBehalfOf: {
+            reference: `Organization/${organizationId}`
+          }
+        },
+        "meta": {
+          "lastUpdated": endTime
+        },
+        "note": [
+          {
+            "text": "Pasien tidak diresepkan obat pada kunjungan ini"
+          }
+        ]
+      };
+
+      medicationsList.push(defaultMedRequest);
+      medicationRefs.push({ reference: `MedicationRequest/${defaultMedId}` });
+    }
+
+    // Selalu tambahkan MedicationRequest ke finalEntries
+    if (medicationsList.length > 0) {
+      finalEntries.push({ resource: medicationsList });
     }
 
     // --- 6. ENCOUNTER ---
@@ -6818,13 +9915,92 @@ async function generateBPJSMedicalRecordBundle() {
           ],
           "text": "Pemeriksaan umum"
         }
-      ]
+      ],
+      serviceProvider: {
+        reference: `Organization/${organizationId}`,
+        display: namaRumahSakit
+      }
     };
     finalEntries.push({ resource: encounterResource });
 
     // --- 7. COMPOSITION ---
     const compositionSections: {[key: string]: any} = {};
-    const keluhan = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || data.keluhan || 'Tidak ada keluhan').trim();
+
+    // Variable untuk mengambil data keluhan dari pemeriksaan_ranap terawal yang dilakukan oleh Dokter
+    const initialDoctorAssessment = (() => {
+      const pemeriksaanRanap = visitDetails.value?.pemeriksaan_ranap || [];
+
+      if (pemeriksaanRanap.length === 0) return '';
+
+      // Cari assessment oleh Dokter
+      const doctorAssessments = pemeriksaanRanap.filter(p =>
+        p.petugas && p.petugas.nama && p.petugas.nama.toLowerCase().includes('dr.')
+      );
+
+      if (doctorAssessments.length > 0) {
+        // Jika ada assessment oleh dokter, cari yang terawal berdasarkan tgl+jam
+        const sortedAssessments = doctorAssessments.sort((a, b) => {
+          const dateA = new Date(`${a.tgl_perawatan} ${a.jam_rawat}`);
+          const dateB = new Date(`${b.tgl_perawatan} ${b.jam_rawat}`);
+          return dateA.getTime() - dateB.getTime();
+        });
+        return sortedAssessments[0]?.keluhan?.trim() || '';
+      } else {
+        // Jika tidak ada assessment oleh dokter, ambil indeks terbesar (terakhir)
+        const lastIndex = pemeriksaanRanap.length - 1;
+        return pemeriksaanRanap[lastIndex]?.keluhan?.trim() || '';
+      }
+    })();
+
+    // Check if this is rawat inap or rawat jalan
+    const isRawatInap = selectedVisitData.value?.jnspelayanan === '1' ||
+                         selectedVisitData.value?.jnspelayanan === 'Ranap' ||
+                         visitDetails.value?.reg_periksa?.jnspelayanan === '1' ||
+                         visitDetails.value?.reg_periksa?.jnspelayanan === 'Ranap';
+
+    // Variable untuk mengambil penilaian dari pemeriksaan_ranap terawal yang dilakukan oleh Dokter
+    const initialDoctorPenilaian = (() => {
+      const pemeriksaanRanap = visitDetails.value?.pemeriksaan_ranap || [];
+
+      if (pemeriksaanRanap.length === 0) return '';
+
+      // Filter hanya assessment oleh Dokter
+      const doctorAssessments = pemeriksaanRanap.filter(p =>
+        p.petugas && p.petugas.nama && p.petugas.nama.toLowerCase().includes('dr.')
+      );
+
+      if (doctorAssessments.length > 0) {
+        // Jika ada assessment oleh dokter, cari yang terawal berdasarkan tgl+jam
+        const sortedAssessments = doctorAssessments.sort((a, b) => {
+          const dateA = new Date(`${a.tgl_perawatan} ${a.jam_rawat}`);
+          const dateB = new Date(`${b.tgl_perawatan} ${b.jam_rawat}`);
+          return dateA.getTime() - dateB.getTime();
+        });
+        return sortedAssessments[0]?.penilaian?.trim() || '';
+      } else {
+        // Jika tidak ada assessment oleh dokter, ambil indeks terbesar (terakhir)
+        const lastIndex = pemeriksaanRanap.length - 1;
+        return pemeriksaanRanap[lastIndex]?.penilaian?.trim() || '';
+      }
+    })();
+
+    let reasonForAdmission;
+    let admissionDiagnosis;
+    let dischargeDiagnosis;
+
+    if (isRawatInap) {
+      // Rawat Inap: Reason for admission dari assessment dokter, Admission diagnosis dari administrasi
+      reasonForAdmission = initialDoctorAssessment ||
+                           visitDetails.value?.kamar_inap?.diagnosa_awal ||
+                           (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || 'Tidak ada keluhan').trim();
+      admissionDiagnosis = visitDetails.value?.kamar_inap?.diagnosa_awal || 'Tidak ada diagnosa awal';
+      dischargeDiagnosis = initialDoctorPenilaian || 'Tidak ada diagnosa saat keluar';
+    } else {
+      // Rawat Jalan: Reason for admission dan Admission diagnosis sama-sama dari pemeriksaan_ralan[0].keluhan
+      reasonForAdmission = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || 'Tidak ada keluhan').trim();
+      admissionDiagnosis = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || 'Tidak ada keluhan').trim();
+      dischargeDiagnosis = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.keluhan || 'Tidak ada diagnosa saat keluar').trim();
+    }
     let sectionIndex = 0; // Use consecutive 0,1,2,3... indices
 
     // Helper function to create sparse keys to prevent automatic array conversion
@@ -6842,12 +10018,12 @@ async function generateBPJSMedicalRecordBundle() {
                 }
               ]
             },
-      text: { status: "additional", div: keluhan },
+      text: { status: "additional", div: reasonForAdmission },
       entry: null
     };
 
     if (diagnosisRefs.length > 0) {
-      // Admission diagnosis
+      // Admission diagnosis - use different data based on patient type
       sectionIndex++;
       compositionSections[String(sectionIndex)] = {
         title: "Admission diagnosis",
@@ -6860,7 +10036,7 @@ async function generateBPJSMedicalRecordBundle() {
                 }
               ]
             },
-        text: { status: "additional", div: "Diagnosa Awal" },
+        text: { status: "additional", div: admissionDiagnosis },
         entry: null
       };
       sectionIndex++;
@@ -6877,44 +10053,13 @@ async function generateBPJSMedicalRecordBundle() {
                 }
               ]
             },
-        text: { status: "additional", div: keluhan },
+        text: { status: "additional", div: reasonForAdmission },
         entry: null
       };
       sectionIndex++;
 
-      // Hospital course Narrative
-      compositionSections[String(sectionIndex)] = {
-        title: "Hospital course Narrative",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "28319-2",
-                  "display": "pain.status"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Perjalanan perawatan pasien" },
-        entry: null
-      };
-      sectionIndex++;
-
-      // Discharge diagnosis
-      compositionSections[String(sectionIndex)] = {
-        title: "Discharge diagnosis",
-        code: {
-              "coding": [
-                {
-                  "system": "http://loinc.org",
-                  "code": "42347-5",
-                  "display": "Discharge diagnosis Narrative"
-                }
-              ]
-            },
-        text: { status: "additional", div: "Diagnosa Pasien" },
-        entry: null
-      };
-    }
+  
+          }
 
     if (medicationRefs.length > 0) {
       // Plan of care
@@ -6937,6 +10082,7 @@ async function generateBPJSMedicalRecordBundle() {
       sectionIndex++;
 
       // Known allergies
+      const alergiText = (visitDetails.value?.cppt_pemeriksaan_ralan?.[0]?.alergi || data.alergi || 'Tidak ada alergi yang diketahui').trim();
       compositionSections[String(sectionIndex)] = {
         title: "Known allergies",
         code: {
@@ -6948,35 +10094,38 @@ async function generateBPJSMedicalRecordBundle() {
                 }
               ]
             },
-        text: { status: "additional", div: "Tidak ada alergi yang diketahui" },
+        text: { status: "additional", div: alergiText },
         entry: null
       };
       sectionIndex++;
       sectionIndex++; // Skip index 6 to match successful Bundle structure (7 -> 8)
 
-      // Medications on Discharge
-      if (medicationsList.length > 0) {
-        const medicationEntries = medicationRefs.map(ref => ({ reference: ref.reference }));
+      // Medications on Discharge - Selalu tampilkan section meskipun tidak ada obat
+      const medicationEntries = medicationRefs.map(ref => ({ reference: ref.reference }));
 
-        compositionSections[String(sectionIndex)] = {
-          title: "Medications on Discharge",
-          code: {
-            "coding": [
-              {
-                "system": "http://loinc.org",
-                "code": "75311-1",
-                "display": "Hospital discharge medications Narrative"
-              }
-            ]
-          },
-          text: {
-            "status": "additional",
-            "div": `Resep Pulang untuk pasien ${data.nm_pasien}`
-          },
-          mode: "working",
-          entry: medicationEntries
-        };
-      }
+      // Tentukan teks berdasarkan apakah ada obat atau tidak
+      const medicationText = medicationsList.length > 0
+        ? `Resep Pulang untuk pasien ${data.nm_pasien}`
+        : `Pasien ${data.nm_pasien} tidak diresepkan obat pada kunjungan ini`;
+
+      compositionSections[String(sectionIndex)] = {
+        title: "Medications on Discharge",
+        code: {
+          "coding": [
+            {
+              "system": "http://loinc.org",
+              "code": "75311-1",
+              "display": "Hospital discharge medications Narrative"
+            }
+          ]
+        },
+        text: {
+          "status": "additional",
+          "div": medicationText
+        },
+        mode: "working",
+        entry: medicationEntries.length > 0 ? medicationEntries : null
+      };
     }
 
     const compositionResource = {
@@ -7055,9 +10204,9 @@ async function generateBPJSMedicalRecordBundle() {
               coding: {
                 system: 'http://snomed.info/sct',
                 code: detail.template?.satu_sehat_mapping_lab?.code || '258236005',
-                display: detail.template?.satu_sehat_mapping_lab?.display || 'Laboratory test'
+                display: detail.template?.satu_sehat_mapping_lab?.display || detail.template?.Pemeriksaan || 'Pemeriksaan'
               },
-              text: detail.template?.Pemeriksaan || 'Pemeriksaan Laboratorium'
+              text: detail.template?.Pemeriksaan || 'Pemeriksaan'
             };
 
             let observation: any = {
@@ -7090,18 +10239,23 @@ async function generateBPJSMedicalRecordBundle() {
                 system: 'http://unitsofmeasure.org',
                 code: detail.template?.satuan || ''
               };
-            } else if (detail.nilai) {
-              observation.valueString = detail.nilai;
+            } else {
+              observation.valueQuantity = {
+                value: 1,
+                unit: "",
+                system: "http://unitsofmeasure.org",
+                code: ""
+              };
             }
 
-             // Add intepretation
-           
+            // Add intepretation - DEFAULT TO 'N' (Normal)
+
               observation.interpretation = {
                 coding: {
                   system: 'http://hl7.org/fhir/v2/0078',
                   code: 'N',
                   display: 'Normal'
-                },
+                }
               };
               
               // Add dynamic reference range if available
@@ -7144,15 +10298,34 @@ async function generateBPJSMedicalRecordBundle() {
                   } else {
                     // Fallback to text if parsing fails
                     observation.referenceRange = {
-                      text: refRangeText
+                      low: {
+                        value: 0
+                      },
+                      high: {
+                        value: 1
+                      }
                     };
                   }
                 } else {
                   // Use as text if doesn't match range format
-                  observation.referenceRange = {
-                    text: refRangeText
-                  };
+                 observation.referenceRange = {
+                      low: {
+                        value: 0
+                      },
+                      high: {
+                        value: 1
+                      }
+                    };
                 }
+              } else {
+                 observation.referenceRange = {
+                      low: {
+                        value: 0
+                      },
+                      high: {
+                        value: 1
+                      }
+                    };
               }
 
                // Set dynamic conclusion based on keterangan field
@@ -7161,38 +10334,38 @@ async function generateBPJSMedicalRecordBundle() {
                  if (ket === 'l' || ket.includes('low') || ket.includes('rendah') || ket.includes('kurang')) {
                    observation.conclusion = 'Rendah';
                    observation.interpretation = {
-                     coding: [{
+                     coding: {
                        system: 'http://hl7.org/fhir/v2/0078',
                        code: 'L',
                        display: 'Low'
-                     }]
+                     }
                    };
                  } else if (ket === 'h' || ket.includes('high') || ket.includes('tinggi') || ket.includes('naik')) {
                    observation.conclusion = 'Tinggi';
                    observation.interpretation = {
-                     coding: [{
+                     coding: {
                        system: 'http://hl7.org/fhir/v2/0078',
                        code: 'H',
                        display: 'High'
-                     }]
+                     }
                    };
                  } else if (ket === 'k' || ket.includes('kritis') || ket.includes('critical') || ket.includes('crit') || ket.includes('emergency') || ket.includes('gawat')) {
                    observation.conclusion = 'Kritis';
                    observation.interpretation = {
-                     coding: [{
+                     coding: {
                        system: 'http://hl7.org/fhir/v2/0078',
                        code: 'C',
                        display: 'Critical'
-                     }]
+                     }
                    };
                  } else if (ket.includes('abnormal') || ket.includes('tidak normal') || ket.includes('anomali')) {
                    observation.conclusion = 'Abnormal';
                    observation.interpretation = {
-                     coding: [{
+                     coding: {
                        system: 'http://hl7.org/fhir/v2/0078',
                        code: 'A',
                        display: 'Abnormal'
-                     }]
+                     }
                    };
                  } else {
                    // Default to normal for other descriptions
@@ -7233,11 +10406,9 @@ async function generateBPJSMedicalRecordBundle() {
             encounter: {
               reference: `Encounter/${encounterId}`
             },
-            effectiveDateTime: `${labItem.tgl_periksa} ${labItem.jam}`,
-            issued: `${labItem.tgl_periksa} ${labItem.jam}`,
             performer: [{
-              reference: `Organization/${labOrganizationId}`,
-              display: 'LABORATORIUM'
+              reference: `Organization/${organizationId}`,
+              display: namaRumahSakit
             }],
             result: observations
           };
@@ -7248,32 +10419,38 @@ async function generateBPJSMedicalRecordBundle() {
       });
     }
 
+    // Get poli name for organization name
+    const kdPoli = visitDetails.value?.reg_periksa?.kd_poli || data.kd_poli
+    const poliMapping: { [key: string]: string } = {
+      'INT': 'Poli Penyakit Dalam',
+      'ANA': 'Poli Anak',
+      'OBG': 'Poli Kebidanan dan Kandungan',
+      'MATA': 'Poli Mata',
+      'THT': 'Poli Telinga Hidung Tenggorokan',
+      'JANTUNG': 'Poli Jantung',
+      'PARU': 'Poli Paru',
+      'SARAF': 'Poli Saraf',
+      'GIGI': 'Poli Gigi dan Mulut',
+      'KULIT': 'Poli Kulit dan Kelamin',
+      'UMUM': 'Poli Umum',
+      'FISIO': 'Poli Fisioterapi'
+    }
+
+    const poliNameFromMapping = kdPoli ? (poliMapping[kdPoli] || '') : ''
+    const poliName = visitDetails.value?.poli?.nm_poli ||
+                    data.nm_poli ||
+                    poliNameFromMapping ||
+                    ''
+
+    const organizationName = poliName ? `${poliName} - ${namaRumahSakit}` : namaRumahSakit
+
     // Check for radiologi data
     if (visitDetails.value?.radiologi && visitDetails.value.radiologi.length > 0) {
       console.log('Available radiologi data:', visitDetails.value.radiologi.length, 'items');
 
       visitDetails.value.radiologi.forEach((radioItem: any, index: number) => {
         const diagnosticReportId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-        const radioOrganizationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-
-        // Create Organization for Radiologi
-        const radioOrganization = {
-          resourceType: 'Organization',
-          id: radioOrganizationId,
-          name: 'RADIOLOGI',
-          identifier: [{
-            use: 'official',
-            type: {
-              coding: [{
-                system: 'http://terminology.hl7.org/CodeSystem/v2-0203',
-                code: 'TAX',
-                display: 'Tax ID number'
-              }]
-            },
-            value: organizationId
-          }]
-        };
-        finalEntries.push({ resource: radioOrganization });
+        // Use main organization for radiology (BPJS only recognizes 1 organization)
 
         // Create Observation for radiology result
         const observationId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
@@ -7283,7 +10460,7 @@ async function generateBPJSMedicalRecordBundle() {
           status: 'final',
           text: {
             status: 'generated',
-            div: `<div xmlns="http://www.w3.org/1999/xhtml">${radioItem.hasil || 'Hasil pemeriksaan radiologi'}</div>`
+            div: `<div xmlns="http://www.w3.org/1999/xhtml">${getRadiologyText([radioItem]).join('<br/>') || 'Hasil pemeriksaan radiologi'}</div>`
           },
           issued: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
           effectiveDateTime: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
@@ -7291,9 +10468,9 @@ async function generateBPJSMedicalRecordBundle() {
             coding: {
               system: 'http://snomed.info/sct',
               code: '394914006',
-              display: 'Radiology imaging procedure'
+              display: radioItem.jenis_perawatan?.nm_perawatan || '-'
             },
-            text: radioItem.jenis_perawatan?.nm_perawatan || 'Pemeriksaan Radiologi'
+            text: radioItem.jenis_perawatan?.nm_perawatan || '-'
           },
           performer: {
             reference: `Practitioner/${practitionerId}`,
@@ -7304,7 +10481,42 @@ async function generateBPJSMedicalRecordBundle() {
             display: patientName,
             noSep: data.no_sep
           },
-          conclusion: radioItem.kesan || 'Impressi radiologi'
+          valueQuantity: {
+            value: 1,
+            unit: "",
+            system: "http://unitsofmeasure.org",
+            code: ""
+          },
+          interpretation: {
+            coding: {
+              system: 'http://hl7.org/fhir/observation-interpretation',
+              code: 'N',
+              display: 'Normal'
+            }
+          },
+          referenceRange: {
+            low: {
+              value: 0
+            },
+            high: {
+              value: 1
+            }
+          },
+          image: radioItem.gambarRadiologi && radioItem.gambarRadiologi.length > 0 ?
+            radioItem.gambarRadiologi.map((gambar: any) => ({
+              comment: gambar.deskripsi || "Gambar Radiologi",
+              link: {
+                reference: gambar.deskripsi || "Gambar Radiologi",
+                display: gambar.lokasi_gambar || ""
+              }
+            })) : [{
+              comment: "",
+              link: {
+                reference: "",
+                display: ""
+              }
+            }],
+          conclusion: extractConclusionFromText(getRadiologyText([radioItem])) || 'Impressi radiologi'
         };
 
   
@@ -7331,8 +10543,8 @@ async function generateBPJSMedicalRecordBundle() {
           effectiveDateTime: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
           issued: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
           performer: [{
-            reference: `Organization/${radioOrganizationId}`,
-            display: 'RADIOLOGI'
+            reference: `Organization/${organizationId}`,
+            display: organizationName || 'Rumah Sakit'
           }],
           result: [radiologyObservation]
         };
@@ -7357,20 +10569,32 @@ async function generateBPJSMedicalRecordBundle() {
         const procId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
         const procName = proc.nm_perawatan;
 
-        // Get procedure code and description from SNOMED mapping if available
-        const codeSystem = 'http://snomed.info/sct';
-        let codeValue = proc.snomed_mapping?.snomed?.code || proc.kd_jenis_prw; // SNOMED code atau fallback ke procedure code
-        let displayValue = proc.snomed_mapping?.snomed?.display || procName; // SNOMED display atau fallback ke procedure name
+        // Get procedure mapping from database tables (rsia_mapping_procedure or rsia_mapping_procedure_inap)
+        let systemValue, codeValue, displayValue;
 
-        // Jika ada SNOMED mapping, gunakan sistem SNOMED, jika tidak gunakan ICD-9-CM
-        const systemValue = proc.snomed_mapping?.snomed?.code ? codeSystem : 'http://hl7.org/fhir/sid/icd-9-cm';
+        if (proc.snomed_mapping && proc.snomed_mapping.mapping) {
+          // Use mapped data from rsia_mapping_procedure or rsia_mapping_procedure_inap
+          systemValue = proc.snomed_mapping.mapping.system || 'http://hl7.org/fhir/sid/icd-9-cm';
+          codeValue = proc.snomed_mapping.mapping.code || proc.kd_jenis_prw;
+          displayValue = proc.snomed_mapping.mapping.display || procName;
+        } else if (proc.snomed_mapping && proc.snomed_mapping.code) {
+          // Use SNOMED mapped data
+          systemValue = 'http://snomed.info/sct';
+          codeValue = proc.snomed_mapping.code;
+          displayValue = proc.snomed_mapping.display || procName;
+        } else {
+          // Fallback to ICD-9-CM if no mapping available
+          systemValue = 'http://hl7.org/fhir/sid/icd-9-cm';
+          codeValue = proc.kd_jenis_prw;
+          displayValue = procName;
+        }
 
         const procedure = {
           resourceType: 'Procedure',
           id: procId,
           text: {
-            "status": "generated",
-            "div": "Generated Narrative with Details"
+            "status": "completed",
+            "div": "<div></div>"
           },
           status: 'completed',
           code: {
@@ -7381,11 +10605,27 @@ async function generateBPJSMedicalRecordBundle() {
             }]
           },
           subject: {
+            "type": null,
+            "identifier": {
+              "use": null,
+              "type": { "coding": [], "text": null },
+              "system": null,
+              "value": null,
+              "assigner": { "display": null }
+            },
             "display": data.nm_pasien,
             "reference": `Patient/${patientId}`
           },
           context: {
-            "display": `${data.nm_pasien} Encounter on ${startTime}`,
+            "type": null,
+            "identifier": {
+              "use": null,
+              "type": { "coding": [], "text": null },
+              "system": null,
+              "value": null,
+              "assigner": { "display": null }
+            },
+            "display": `${data.nm_pasien} encounter on ${new Date(startTime).getDate()} ${new Date(startTime).toLocaleString('id-ID', { month: 'long' })} ${new Date(startTime).getFullYear()} ${new Date(startTime).getHours().toString().padStart(2, '0')}:${new Date(startTime).getMinutes().toString().padStart(2, '0')}`,
             "reference": `Encounter/${encounterId}`
           },
           performedPeriod: {
@@ -7401,40 +10641,26 @@ async function generateBPJSMedicalRecordBundle() {
                     "code": codeValue,
                     "display": displayValue
                   }
-                ]
+                ],
+                "text": null
               },
               "actor": {
+                "type": null,
+                "identifier": {
+                  "use": null,
+                  "type": { "coding": [], "text": null },
+                  "system": null,
+                  "value": null,
+                  "assigner": { "display": null }
+                },
                 "display": practitionerName,
                 "reference": `Practitioner/${practitionerId}`
               }
             }
           ],
-          reasonCode: [{
-            "text": "DiagnosticReport/f201"
-          }],
-          bodySite: [{
-            "coding": [
-              {
-                "system": "http://snomed.info/sct",
-                "code": "385432009",
-                "display": "Not applicable"
-              }
-            ]
-          }],
-          focalDevice: [{
-            "action": {
-              "coding": [
-                {
-                  "system": "http://hl7.org/fhir/device-action",
-                  "code": "manipulated"
-                }
-              ],
-              "text": "Tidak ada"
-            },
-            "manipulated": {
-              "reference": "Device/not-applicable"
-            }
-          }],
+          reasonCode: [],
+          bodySite: [],
+          focalDevice: [],
           note: [
             {
               "text": ""
@@ -7560,8 +10786,8 @@ async function generateBPJSMedicalRecordBundle() {
 
 // Fungsi untuk mengirim hanya Patient resource
 async function sendPatientResourceOnly() {
-  // Simulasi dengan nomor SEP tertentu untuk testing
-  const validSep = '0166R0011125V000005'
+  // Get actual SEP number from visit data
+  const validSep = selectedVisitData.value?.no_sep || visitDetails.value?.sep?.noSep || ''
 
   // Tambahkan UI state management
   sendingToBpjs.value = true
@@ -7615,6 +10841,31 @@ async function sendPatientResourceOnly() {
     const kodeFaskesBpjs = hospitalSetting.kode_faskes_bpjs || '0166R001'
     const kodeKemenkes = hospitalSetting.kode_kemenkes || '3326051'
     const namaRumahSakit = hospitalSetting.nama_instansi || 'RSIA AISYIYAH PEKAJANGAN'
+
+    // Get poli name for organization name
+    const kdPoli = visitDetails.value?.reg_periksa?.kd_poli || data.kd_poli
+    const poliMapping: { [key: string]: string } = {
+      'INT': 'Poli Penyakit Dalam',
+      'ANA': 'Poli Anak',
+      'OBG': 'Poli Kebidanan dan Kandungan',
+      'MATA': 'Poli Mata',
+      'THT': 'Poli Telinga Hidung Tenggorokan',
+      'JANTUNG': 'Poli Jantung',
+      'PARU': 'Poli Paru',
+      'SARAF': 'Poli Saraf',
+      'GIGI': 'Poli Gigi dan Mulut',
+      'KULIT': 'Poli Kulit dan Kelamin',
+      'UMUM': 'Poli Umum',
+      'FISIO': 'Poli Fisioterapi'
+    }
+
+    const poliNameFromMapping = kdPoli ? (poliMapping[kdPoli] || '') : ''
+    const poliName = visitDetails.value?.poli?.nm_poli ||
+                    data.nm_poli ||
+                    poliNameFromMapping ||
+                    ''
+
+    const organizationName = poliName ? `${poliName} - ${namaRumahSakit}` : namaRumahSakit
 
     // Get jnspelayanan with same logic as other functions
     const jnsPelayananFromSEP = visitDetails.value?.sep?.jnsPelayanan
@@ -7881,9 +11132,226 @@ style.textContent = `
   }
 }
 
+// Helper functions for medication request processing
+function getAdditionalInstruction(obat: any): string {
+  console.log('🔍 getAdditionalInstruction called with obat:', JSON.stringify(obat, null, 2))
+
+  if (!obat) {
+    console.log('❌ No obat data provided')
+    return "Tidak ada instruksi tambahan"
+  }
+
+  console.log('📋 Processing obat data:', {
+    tipe_rawatan: obat.tipe_rawatan,
+    kode_brng: obat.kode_brng,
+    nama_brng: obat.nama_brng,
+    aturan_pakai: obat.aturan_pakai,
+    jenis_resep: obat.jenis_resep,
+    status_resep: obat.status_resep
+  })
+
+  // Rawat Inap - use dosis field from resep_pulang table
+  if (obat.tipe_rawatan === 'Rawat Inap') {
+    const result = obat.dosis || "Tidak ada instruksi tambahan"
+    console.log('🏥 Rawat Inap - returning:', result)
+    return result
+  }
+
+  // Rawat Jalan - check different sources for aturan pakai
+  if (obat.tipe_rawatan === 'Rawat Jalan') {
+    // Check if it's compound medication (racikan)
+    if (obat.jenis_resep === 'Racik') {
+      console.log('🧪 Processing racikan medication')
+      // For compound medications from resep_dokter_racikan
+      if (obat.aturan_pakai && obat.aturan_pakai.aturan) {
+        const result = obat.aturan_pakai.aturan
+        console.log('✅ Racikan (object.aturan):', result)
+        return result
+      }
+      if (obat.aturan_pakai && obat.keterangan_aturan) {
+        const result = obat.keterangan_aturan
+        console.log('✅ Racikan (keterangan_aturan):', result)
+        return result
+      }
+      const result = "Dikonsumsi sesuai kebutuhan"
+      console.log('⚠️ Racikan (default):', result)
+      return result
+    }
+
+    // Non-compound medication from resep_dokter table
+    if (obat.jenis_resep === 'Non Racik') {
+      console.log('💊 Processing non-racikan medication')
+      // Check if aturan_pakai is a string (from resep_dokter.aturan_pakai)
+      if (obat.aturan_pakai) {
+        if (typeof obat.aturan_pakai === 'string') {
+          const result = obat.aturan_pakai
+          console.log('✅ Non-racikan (string):', result)
+          return result
+        }
+        // If it's an object, try to get aturan property
+        if (typeof obat.aturan_pakai === 'object' && obat.aturan_pakai.aturan) {
+          const result = obat.aturan_pakai.aturan
+          console.log('✅ Non-racikan (object.aturan):', result)
+          return result
+        }
+      }
+      const result = "-"
+      console.log('⚠️ Non-racikan (default):', result)
+      return result
+    }
+
+    // Fallback for other structures (backward compatibility)
+    console.log('🔄 Using fallback logic')
+    // Priority 1: aturan_pakai from detail_pemberian_obat (compound medications)
+    if (obat.aturan_pakai && obat.aturan_pakai.aturan) {
+      const result = obat.aturan_pakai.aturan
+      console.log('✅ Fallback (object.aturan):', result)
+      return result
+    }
+
+    // Priority 2: aturan_pakai as string
+    if (obat.aturan_pakai && typeof obat.aturan_pakai === 'string') {
+      const result = obat.aturan_pakai
+      console.log('✅ Fallback (string):', result)
+      return result
+    }
+
+    // Priority 3: Check by status_resep
+    if (obat.status_resep === 'Racik') {
+      const result = obat.keterangan_aturan || obat.aturan_pakai?.aturan || "Dikonsumsi sesuai kebutuhan"
+      console.log('✅ Fallback (status_resep=Racik):', result)
+      return result
+    }
+
+    // Default fallback
+    const result = "Dikonsumsi sesuai kebutuhan"
+    console.log('⚠️ Default fallback:', result)
+    return result
+  }
+
+  // Final fallback - this should never be reached but TypeScript requires it
+  return "Tidak ada instruksi tambahan"
+}
+
+function getRouteCode(medicationName: string): string {
+  if (!medicationName) return "26643006" // Default oral route
+
+  const name = medicationName.toLowerCase()
+
+  if (name.includes('injek') || name.includes('suntik') || name.includes('injeksi')) {
+    return "47625008" // Intravenous route
+  } else if (name.includes('tablet') || name.includes('kaplet') || name.includes('pil')) {
+    return "26643006" // Oral route
+  } else if (name.includes('kapsul') || name.includes('capsule')) {
+    return "26643006" // Oral route
+  } else if (name.includes('sirup') || name.includes('cair') || name.includes('liquid')) {
+    return "26643006" // Oral route
+  } else if (name.includes('salep') || name.includes('krim') || name.includes('cream') || name.includes('ointment')) {
+    return "421021004" // Topical route
+  } else if (name.includes('tetes') || name.includes('drop') || name.includes('eye') || name.includes('mata')) {
+    return "54485007" // Ophthalmic route
+  } else if (name.includes('suppositoria') || name.includes('suppo')) {
+    return "37161004" // Rectal route
+  }
+
+  return "26643006" // Default to oral route
+}
+
+function getRouteDisplay(medicationName: string): string {
+  if (!medicationName) return "Oral Route"
+
+  const name = medicationName.toLowerCase()
+
+  if (name.includes('injek') || name.includes('suntik') || name.includes('injeksi')) {
+    return "Intravenous Route"
+  } else if (name.includes('tablet') || name.includes('kaplet') || name.includes('pil')) {
+    return "Oral Route"
+  } else if (name.includes('kapsul') || name.includes('capsule')) {
+    return "Oral Route"
+  } else if (name.includes('sirup') || name.includes('cair') || name.includes('liquid')) {
+    return "Oral Route"
+  } else if (name.includes('salep') || name.includes('krim') || name.includes('cream') || name.includes('ointment')) {
+    return "Topical Route"
+  } else if (name.includes('tetes') || name.includes('drop') || name.includes('eye') || name.includes('mata')) {
+    return "Ophthalmic Route"
+  } else if (name.includes('suppositoria') || name.includes('suppo')) {
+    return "Rectal Route"
+  }
+
+  return "Oral Route"
+}
+
+function getDosageFrequency(medicationName: string): number {
+  if (!medicationName) return 1 // Default once daily
+
+  const name = medicationName.toLowerCase()
+
+  if (name.includes('1x1') || name.includes('sehari sekali')) {
+    return 1
+  } else if (name.includes('2x1') || name.includes('dua kali sehari')) {
+    return 2
+  } else if (name.includes('3x1') || name.includes('tiga kali sehari')) {
+    return 3
+  } else if (name.includes('4x1') || name.includes('empat kali sehari')) {
+    return 4
+  }
+
+  return 1 // Default once daily
+}
+
+function getMedicationFormCode(medicationName: string): string {
+  if (!medicationName) return "385055001" // Default tablet form
+
+  const name = medicationName.toLowerCase()
+
+  if (name.includes('tablet') || name.includes('kaplet') || name.includes('pil')) {
+    return "385055001" // Tablet
+  } else if (name.includes('kapsul') || name.includes('capsule')) {
+    return "385056004" // Capsule
+  } else if (name.includes('sirup') || name.includes('cair') || name.includes('liquid')) {
+    return "385263001" // Liquid
+  } else if (name.includes('salep') || name.includes('krim') || name.includes('cream') || name.includes('ointment')) {
+    return "385049006" // Ointment
+  } else if (name.includes('injek') || name.includes('suntik') || name.includes('injeksi')) {
+    return "385219200" // Injection solution
+  } else if (name.includes('tetes') || name.includes('drop')) {
+    return "440145006" // Drops
+  }
+
+  return "385055001" // Default to tablet
+}
+
+function getMedicationFormDisplay(medicationName: string): string {
+  if (!medicationName) return "Tablet"
+
+  const name = medicationName.toLowerCase()
+
+  if (name.includes('tablet') || name.includes('kaplet') || name.includes('pil')) {
+    return "Tablet"
+  } else if (name.includes('kapsul') || name.includes('capsule')) {
+    return "Capsule"
+  } else if (name.includes('sirup') || name.includes('cair') || name.includes('liquid')) {
+    return "Liquid"
+  } else if (name.includes('salep') || name.includes('krim') || name.includes('cream') || name.includes('ointment')) {
+    return "Ointment"
+  } else if (name.includes('injek') || name.includes('suntik') || name.includes('injeksi')) {
+    return "Injection Solution"
+  } else if (name.includes('tetes') || name.includes('drop')) {
+    return "Drops"
+  }
+
+  return "Tablet"
+}
+
 // Add styles on client-side mount
 onMounted(() => {
   addToastStyles()
+
+  // Add scroll listener for floating navigation
+  window.addEventListener('scroll', handleScroll, { passive: true })
+
+  // Initial check
+  handleScroll()
 })
 
 </script>

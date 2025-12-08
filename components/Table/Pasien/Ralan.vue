@@ -6,6 +6,7 @@ import { getPercentage, getDifference } from '~/utils/costCompare'
 const config = useRuntimeConfig()
 const tokenStore = useAccessTokenStore()
 
+
 const noRekamMedis = ref('')
 const noRawat = ref('')
 const pdfUrl = ref('')
@@ -45,6 +46,43 @@ const props = defineProps({
 watch(() => props.costStatus, () => {
   (localCostStatus as any).value = props.costStatus
 })
+
+// ERM BPJS Status composable
+const { checkErmBpjsStatus, checkMultipleErmStatus, clearCache, isLoading } = useErmBpjsStatus()
+
+// Reactive untuk menyimpan status ERM BPJS per SEP
+const ermBpjsStatus = ref<Record<string, boolean>>({})
+
+// Watch untuk changes in data dan check ERM status
+watch(() => props.data, async (newData) => {
+  if (newData?.data && Array.isArray(newData.data)) {
+    const sepList = newData.data
+      .map((row: any) => row.no_sep)
+      .filter(Boolean) // Remove null/undefined
+
+    if (sepList.length > 0) {
+      const results = await checkMultipleErmStatus(sepList)
+      const newStatus: Record<string, boolean> = {}
+      results.forEach((status, noSep) => {
+        newStatus[noSep] = status
+      })
+      ermBpjsStatus.value = { ...newStatus }
+    }
+  }
+}, { immediate: true, deep: true })
+
+// Check individual SEP status (for real-time updates)
+const getErmStatus = async (noSep: string) => {
+  if (!noSep) return false
+
+  if (ermBpjsStatus.value[noSep] !== undefined) {
+    return ermBpjsStatus.value[noSep]
+  }
+
+  const status = await checkErmBpjsStatus(noSep)
+  ermBpjsStatus.value[noSep] = status
+  return status
+}
 
 const doDeleteBerkas = async () => {
   const confirmDelete = confirm('Apakah anda yakin ingin menghapus pengajuan ini?')
@@ -133,7 +171,16 @@ const rowMenu = (row: any) => {
       icon: 'i-tabler-pig-money',
       disabled: !row?.pasien?.no_rkm_medis,
       click: () => {
-        openNewTab(buildUrlErm(row.pasien?.no_rkm_medis));
+        try {
+          const noRm = row.pasien?.no_rkm_medis;
+          if (noRm) {
+            openNewTab(buildUrlErm(noRm));
+          } else {
+            console.error('No RM not found for patient:', row);
+          }
+        } catch (error) {
+          console.error('Error opening ERM page:', error);
+        }
       }
     }],
     [{
@@ -357,19 +404,45 @@ const rowMenu = (row: any) => {
                 </UBadge>
               </UTooltip>
             </template>
+            <!-- ERM BPJS Badge -->
+            <template v-if="row.no_sep && ermBpjsStatus[row.no_sep] === true">
+              <span class="text-gray-500 font-semibold text-sm px-1">|</span>
+              <UTooltip text="ERM BPJS Terkirim (Status 200)" :popper="{ placement: 'top' }"
+                :ui="{ background: 'bg-emerald-200 dark:bg-emerald-900' }">
+                <UBadge size="xs" color="emerald" variant="subtle" class="flex items-center gap-1">
+                  <UIcon name="i-tabler-file-check" class="text-emerald-400 h-4.5 w-4.5" />
+                  ERM BPJS
+                </UBadge>
+              </UTooltip>
+            </template>
+            <!-- Loading ERM Status -->
+            <template v-else-if="row.no_sep && isLoading(row.no_sep)">
+              <span class="text-gray-500 font-semibold text-sm px-1">|</span>
+              <UTooltip text="Checking ERM BPJS Status..." :popper="{ placement: 'top' }"
+                :ui="{ background: 'bg-amber-200 dark:bg-amber-900' }">
+                <UBadge size="xs" color="amber" variant="subtle" class="flex items-center gap-1">
+                  <UIcon name="i-tabler-loader-2" class="text-amber-400 h-4.5 w-4.5 animate-spin" />
+                  ERM
+                </UBadge>
+              </UTooltip>
+            </template>
           </div>
         </div>
 
         <div class="flex flex-col gap-1">
-          <UBadge :color="row.no_sep ? 'primary' : 'primary'" variant="soft">
-            <div class="flex gap-2 items-center justify-between w-full pl-1">
-              {{ row.no_sep ?? "-" }}
-              <template v-if="row.no_sep && isSupported">
-                <UButton icon="i-tabler-copy" color="primary" variant="soft" size="2xs" @click="copy(row.no_sep)" />
-              </template>
-            </div>
-          </UBadge>
+          <!-- SEP Badge -->
+          <div class="flex gap-1 items-center">
+            <UBadge :color="row.no_sep ? 'primary' : 'primary'" variant="soft">
+              <div class="flex gap-2 items-center justify-between w-full pl-1">
+                {{ row.no_sep ?? "-" }}
+                <template v-if="row.no_sep && isSupported">
+                  <UButton icon="i-tabler-copy" color="primary" variant="soft" size="2xs" @click="copy(row.no_sep)" />
+                </template>
+              </div>
+            </UBadge>
+          </div>
 
+          <!-- No Rawat Badge -->
           <UBadge color="sky" variant="soft">
             <div class="flex gap-2 items-center justify-between w-full pl-1">
               {{ row.no_rawat ?? "-" }}

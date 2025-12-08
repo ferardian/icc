@@ -132,6 +132,28 @@
                   </UBadge>
                 </UTooltip>
               </template>
+              <!-- ERM BPJS Badge -->
+              <template v-if="row.sep_simple?.no_sep && ermBpjsStatus[row.sep_simple.no_sep]">
+                <span class="text-gray-500 font-semibold text-sm px-1">|</span>
+                <UTooltip text="ERM BPJS Terkirim (Status 200)" :popper="{ placement: 'top' }"
+                  :ui="{ background: 'bg-emerald-200 dark:bg-emerald-900' }">
+                  <UBadge size="xs" color="emerald" variant="subtle" class="flex items-center gap-1">
+                    <UIcon name="i-tabler-file-check" class="text-emerald-400 h-4.5 w-4.5" />
+                    ERM BPJS
+                  </UBadge>
+                </UTooltip>
+              </template>
+              <!-- Loading ERM Status -->
+              <template v-else-if="row.sep_simple?.no_sep && isLoading(row.sep_simple.no_sep)">
+                <span class="text-gray-500 font-semibold text-sm px-1">|</span>
+                <UTooltip text="Checking ERM BPJS Status..." :popper="{ placement: 'top' }"
+                  :ui="{ background: 'bg-amber-200 dark:bg-amber-900' }">
+                  <UBadge size="xs" color="amber" variant="subtle" class="flex items-center gap-1">
+                    <UIcon name="i-tabler-loader-2" class="text-amber-400 h-4.5 w-4.5 animate-spin" />
+                    ERM
+                  </UBadge>
+                </UTooltip>
+              </template>
             </div>
           </div>
 
@@ -467,6 +489,7 @@ import { determineStatus } from '~/common/helpers/statusHelper';
 import { setStatus } from '~/common/helpers/statusHelper';
 
 const buildUrl = (noRawat: string) => `/sep/${btoa(noRawat)}`
+const buildUrlErm = (noRawat: string) => `/erm/${btoa(noRawat)}`
 
 const sep = ref('')
 const pdfUrl = ref('')
@@ -490,6 +513,7 @@ const contextMenuRow = ref()
 const props = defineProps<{
   query: any
 }>()
+
 
 // Watch for SEP changes and update PDF URL
 watch(sep, (val) => {
@@ -577,7 +601,7 @@ const openNewTab = (url: string) => {
   window.open(url, '_blank')
 }
 
-const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
+const { copy, copied, isSupported } = useClipboard({ source: ref('') })
 
 const rc = ref<RealCostRawatInap[]>([])
 const gc = ref<GroupingCostRawatInap[]>([])
@@ -716,6 +740,30 @@ const { data: pasienRanap, status, refresh } = await useAsyncData<ResourcePagina
   watch: [currentPage, bodyReqs]
 })
 
+// ERM BPJS Status composable
+const { checkErmBpjsStatus, checkMultipleErmStatus, isLoading } = useErmBpjsStatus()
+
+// Reactive untuk menyimpan status ERM BPJS per SEP
+const ermBpjsStatus = ref<Record<string, boolean>>({})
+
+// Watch for changes in pasienRanap data dan check ERM status
+watch(pasienRanap, async (newData) => {
+  if (newData?.data && Array.isArray(newData.data)) {
+    const sepList = newData.data
+      .map((row: any) => row.sep_simple?.no_sep)
+      .filter(Boolean) // Remove null/undefined
+
+    if (sepList.length > 0) {
+      const results = await checkMultipleErmStatus(sepList)
+      const newStatus: Record<string, boolean> = {}
+      results.forEach((status, noSep) => {
+        newStatus[noSep] = status
+      })
+      ermBpjsStatus.value = { ...newStatus }
+    }
+  }
+}, { immediate: true, deep: true })
+
 // Update displayed data based on pasienRanap changes
 function updateShowedData() {
   showedNoRawat.value = pasienRanap.value?.data.map((item: any) => item.no_rawat) ?? []
@@ -803,6 +851,13 @@ const rowMenu = (row: any) => {
         pdfReady.value = false;
         openDokumen.value = true;
         sep.value = row.sep_simple?.no_sep
+      }
+    },{
+      label: 'ERM BPJS',
+      icon: 'i-tabler-pig-money',
+      disabled: !row?.pasien?.no_rkm_medis,
+      click: () => {
+        openNewTab(buildUrlErm(row.pasien?.no_rkm_medis));
       }
     }],
     [{
