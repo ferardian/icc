@@ -1184,17 +1184,17 @@
                   </h5>
                   <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Resep obat untuk pasien rawat jalan yang dikelompokkan berdasarkan nomor resep</p>
                 </div>
-                <div v-for="(resep, index) in processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Jalan').reduce((groups, item) => {
-                  const key = item.no_resep;
+                <div v-for="(resep, noResep) in processedResepObat.filter(item => item.tipe_rawatan === 'Rawat Jalan').reduce((groups, item) => {
+                  const key = item.no_resep || 'no-resep';
                   if (!groups[key]) groups[key] = [];
                   groups[key].push(item);
                   return groups;
-                }, {})" :key="`ralan-${index}`" class="border-b dark:border-gray-700 pb-6 last:border-b-0">
+                }, {})" :key="`ralan-${noResep}`" class="border-b dark:border-gray-700 pb-6 last:border-b-0">
                   <!-- Header Resep Rawat Jalan -->
                   <div class="flex justify-between items-start mb-4">
                     <div class="flex-1">
                       <div class="flex items-center gap-2 mb-2">
-                        <h5 class="font-semibold text-gray-900 dark:text-white">No. Resep: {{ Object.keys(resep)[0] }}</h5>
+                        <h5 class="font-semibold text-gray-900 dark:text-white">No. Resep: {{ noResep === 'no-resep' ? (resep[0]?.no_resep || 'Tidak ada nomor resep') : noResep }}</h5>
                         <UBadge
                           :label="resep[0].status_resep || 'Belum Diberikan'"
                           :color="resep[0].status_resep === 'Selesai' ? 'green' : resep[0].status_resep === 'Diproses' ? 'yellow' : 'gray'"
@@ -1836,7 +1836,7 @@
         </div>
 
         <!-- AUTO SUGGESTIONS -->
-        <div v-if="snomedSuggestions.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div v-if="snomedSuggestions.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 ml-16 mt-5">
           <div class="bg-amber-50 dark:bg-amber-900/20 px-6 py-4 rounded-t-xl border-b border-amber-200 dark:border-amber-800">
             <div class="flex items-center gap-2">
               <UIcon name="i-tabler-bulb" class="w-5 h-5 text-amber-600 dark:text-amber-400" />
@@ -9573,8 +9573,8 @@ async function generateBPJSMedicalRecordBundle() {
     }
 
     // --- 5. MEDICATION REQUEST (Obat) ---
-    // Use resepObat directly since it's already set from API response
-    const obatList = resepObat.value || visitDetails.value?.obat || [];
+    // Use processedResepObat to get the processed racikan data with is_racikan flags
+    const obatList = processedResepObat.value || resepObat.value || visitDetails.value?.obat || [];
 
     // Process medications for both rawat jalan and rawat inap
     if (obatList.length > 0) {
@@ -9600,64 +9600,80 @@ async function generateBPJSMedicalRecordBundle() {
         medicationGroups.get(groupKey).medications.push(obat);
       });
 
-      // Create MedicationRequest for each group
+      // Create one MedicationRequest for each medication in each prescription group
       medicationGroups.forEach((group, groupKey) => {
+        const isRawatInap = group.tipe_rawatan === 'Rawat Inap';
+
         group.medications.forEach((obat, index) => {
           const medId = `${kodeFaskesBpjs}-${kodeKemenkes}-${jnsPelayanan}-${generateUUID()}`;
-          const medName = obat.display_nama_brng || obat.nama_brng || 'Obat';
+
+          // For racikan, create special formatted name; for non-racikan, use nama_brng
+          let medName = obat.nama_brng || 'Obat';
+
+          // Process racikan medications
+          if (obat.status_resep === 'Racik' && obat.is_racikan) {
+            const racikanName = obat.nama_brng;
+            const componentLines = obat.display_nama_brng.split('\n').slice(1);
+            const componentInfo = componentLines.map(line => {
+              const match = line.match(/^\s*-\s*(.+?)\s+dosis\s+(.+?),\s*jml:\s*(.+)$/);
+              if (match) {
+                return `${match[1]} (${match[2]})`;
+              }
+              return line.trim();
+            }).filter(Boolean);
+            const componentsText = componentInfo.join(', ');
+            medName = `${racikanName} - ${componentsText}`;
+          } else if (obat.status_resep === 'Racik' && !obat.is_racikan && obat.racikan_detail && obat.racikan_detail.length > 0) {
+            const racikanName = obat.nama_brng;
+            const componentInfo = obat.racikan_detail.map((detail: any) => {
+              const name = detail.nama_brng || 'Tidak diketahui';
+              let dosage = detail.kandungan || '-';
+              if (detail.kandungan && typeof detail.kandungan === 'string') {
+                const dosageMatch = detail.kandungan.match(/(\d+\.?\d*)\s*(mg|mcg|g|ml|iu|unit)/i);
+                if (dosageMatch) {
+                  dosage = `${dosageMatch[1]} ${dosageMatch[2]}`;
+                }
+              }
+              return `${name} (${dosage})`;
+            }).filter(Boolean);
+            const componentsText = componentInfo.join(', ');
+            medName = `${racikanName} - ${componentsText}`;
+          }
+
           // For racikan, use RACIKAN-X format; for non-racikan, use kode_brng
           const medCode = (obat.status_resep === 'Racik' && obat.kode_brng && obat.kode_brng.startsWith('RACIKAN-')) ?
             obat.kode_brng :
             (obat.kode_brng || '000');
           const jumlah = obat.jml || 1;
           const satuan = obat.kode_sat || 'TAB';
-          const isRawatInap = obat.tipe_rawatan === 'Rawat Inap';
-
-          // Determine intent based on treatment type
-          const intent = isRawatInap ? 'discharge' : 'order';
-
-          // Determine status based on treatment type and prescription status
-          let status = 'active';
-          if (!isRawatInap && group.status_resep === 'Batal') {
-            status = 'cancelled';
-          } else if (!isRawatInap && group.status_resep === 'Selesai') {
-            status = 'completed';
-          } else if (isRawatInap) {
-            status = 'active'; // Default for discharge medications
-          }
+          const intent = 'final';
+          const prescriptionType = group.tipe_rawatan === 'Rawat Inap' ? 'Resep Pulang' : 'Resep Rawat Jalan';
 
           const medRequest = {
             resourceType: 'MedicationRequest',
             id: medId,
             text: {
-              "div": `${medName} (${isRawatInap ? 'Resep Pulang' : 'Resep Rawat Jalan'})`
+              "div": `${medName} (${prescriptionType})`
             },
-            status: status,
             intent: intent,
             identifier: {
               "system": isRawatInap ? "id_resep_pulang" : "id_resep_obat",
               "value": group.no_resep || `${groupKey}-${index + 1}`
             },
-            authoredOn: group.tgl_peresepan ? `${group.tgl_peresepan}T${group.jam_peresepan || '00:00:00'}` : new Date().toISOString(),
             subject: {
               "display": data.nm_pasien,
               "reference": `Patient/${patientId}`
-            },
-            encounter: {
-              "reference": `Encounter/${encounterId}`
             },
             medicationCodeableConcept: {
               "coding": [
                 {
                   "system": "https://rsiaaisyiyah.com/drug",
-                  "code": medCode,
-                  "display": medName
+                  "code": medCode
                 }
               ],
               "text": medName
             },
             dosageInstruction: [{
-              text: isRawatInap ? "Obat pulang sesuai kebutuhan" : "Dosis sesuai kebutuhan",
               "doseQuantity": {
                 "code": satuan,
                 "system": "http://unitsofmeasure.org",
@@ -9671,12 +9687,11 @@ async function generateBPJSMedicalRecordBundle() {
                     "code": getRouteCode(medName),
                     "display": getRouteDisplay(medName)
                   }
-                ],
-                "text": getRouteDisplay(medName)
+                ]
               },
               "timing": {
                 "repeat": {
-                  "frequency": getDosageFrequency(medName),
+                  "frequency": "1",
                   "period": "1",
                   "periodUnit": "d"
                 }
@@ -9690,11 +9705,11 @@ async function generateBPJSMedicalRecordBundle() {
             reasonCode: [
               {
                 "coding": [{
-                  "system": "http://snomed.info/sct",
-                  "code": "160244002",
-                  "display": isRawatInap ? "Discharge medication" : "Outpatient medication"
+                  "system": "",
+                  "code": "",
+                  "display": ""
                 }],
-                "text": isRawatInap ? "Obat pulang pasien rawat inap" : "Obat untuk pasien rawat jalan"
+                "text": ""
               }
             ],
             requester: {
@@ -9706,12 +9721,7 @@ async function generateBPJSMedicalRecordBundle() {
                 reference: `Organization/${organizationId}`
               }
             },
-            "meta": { "lastUpdated": endTime },
-            "note": isRawatInap ? [
-              {
-                "text": "Resep pulang untuk pasien rawat inap"
-              }
-            ] : []
+            "meta": { "lastUpdated": endTime }
           };
           medicationsList.push(medRequest);
           medicationRefs.push({ reference: `MedicationRequest/${medId}` });
