@@ -760,6 +760,14 @@
                     variant="soft"
                     @click="openAddMappingForSOAP(soap, 'keluhan')"
                   />
+                  <UButton
+                    icon="i-tabler-sparkles"
+                    size="2xs"
+                    color="indigo"
+                    variant="soft"
+                    @click="openAddMappingWithAI(soap, 'keluhan')"
+                    title="Cari via AI"
+                  />
                 </div>
                 <div class="ml-6 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <p class="text-sm">{{ soap.keluhan }}</p>
@@ -793,6 +801,14 @@
                     color="blue"
                     variant="soft"
                     @click="openAddMappingForSOAP(soap, 'pemeriksaan')"
+                  />
+                  <UButton
+                    icon="i-tabler-sparkles"
+                    size="2xs"
+                    color="indigo"
+                    variant="soft"
+                    @click="openAddMappingWithAI(soap, 'pemeriksaan')"
+                    title="Cari via AI"
                   />
                 </div>
                 <div class="ml-6 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
@@ -828,6 +844,14 @@
                     variant="soft"
                     @click="openAddMappingForSOAP(soap, 'penilaian')"
                   />
+                  <UButton
+                    icon="i-tabler-sparkles"
+                    size="2xs"
+                    color="indigo"
+                    variant="soft"
+                    @click="openAddMappingWithAI(soap, 'penilaian')"
+                    title="Cari via AI"
+                  />
                 </div>
                 <div class="ml-6 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
                   <p class="text-sm">{{ soap.penilaian }}</p>
@@ -861,6 +885,14 @@
                     color="blue"
                     variant="soft"
                     @click="openAddMappingForSOAP(soap, 'rtl')"
+                  />
+                  <UButton
+                    icon="i-tabler-sparkles"
+                    size="2xs"
+                    color="indigo"
+                    variant="soft"
+                    @click="openAddMappingWithAI(soap, 'rtl')"
+                    title="Cari via AI"
                   />
                 </div>
                 <div class="ml-6 p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
@@ -2069,7 +2101,18 @@
 
           <!-- Search SNOMED -->
           <div>
-            <label class="block text-sm font-medium mb-2">Search SNOMED Concept</label>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-medium">Search SNOMED Concept</label>
+              <UButton
+                icon="i-tabler-sparkles"
+                label="Cari via AI"
+                color="indigo"
+                variant="soft"
+                size="2xs"
+                :loading="searchingSnomedAI"
+                @click="searchSnomedAI"
+              />
+            </div>
             <UInput
               v-model="snomedSearchTerm"
               placeholder="Type to search... (min 3 characters)"
@@ -2086,28 +2129,63 @@
               </template>
             </UInput>
 
-            <!-- Search Results -->
-            <div
-              v-if="snomedSearchResults.length > 0"
-              class="mt-2 border dark:border-gray-700 rounded max-h-60 overflow-y-auto"
-            >
-              <div
-                v-for="result in snomedSearchResults"
-                :key="result.snomed_concept_id"
-                class="p-3 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer border-b dark:border-gray-700 last:border-b-0"
-                @click="selectSnomedConcept(result)"
+            <!-- Tab-like headers for distinction -->
+            <div class="flex items-center gap-4 mt-4 mb-2 border-b dark:border-gray-700">
+              <button 
+                class="pb-2 text-xs font-semibold uppercase tracking-wider transition-colors"
+                :class="!aiSnomedResults.length || snomedSearchTerm ? 'text-blue-500 border-b-2 border-blue-500' : 'text-gray-400 hover:text-gray-600'"
+                @click="aiSnomedResults = []"
               >
-                <p class="font-semibold text-sm">{{ result.snomed_term }}</p>
-                <p class="text-xs text-gray-500 mt-1">
-                  ID: {{ result.snomed_concept_id }} |
-                  Tag: {{ result.semantic_tag || 'N/A' }}
-                </p>
-              </div>
+                Manual Search
+              </button>
+              <button 
+                v-if="aiSnomedResults.length > 0"
+                class="pb-2 text-xs font-semibold uppercase tracking-wider text-indigo-500 border-b-2 border-indigo-500 transition-colors"
+              >
+                AI Recommendations
+              </button>
             </div>
 
+            <!-- Manual Search Results -->
+            <div v-if="snomedSearchResults.length > 0" class="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div
+                v-for="res in snomedSearchResults"
+                :key="res.snomed_concept_id"
+                class="p-2 bg-gray-50 dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900 border border-gray-100 dark:border-gray-700 rounded cursor-pointer transition-all"
+                @click="selectSnomedConcept(res)"
+              >
+                <p class="text-sm font-medium">{{ res.snomed_term }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <p class="text-[10px] text-gray-500">ID: {{ res.snomed_concept_id }}</p>
+                  <UBadge :label="res.semantic_tag || 'N/A'" size="xs" color="gray" variant="subtle" />
+                </div>
+              </div>
+            </div>
             <p v-else-if="snomedSearchTerm && snomedSearchTerm.length >= 3 && !searchingSnomed" class="text-sm text-gray-500 mt-2">
               No results found
             </p>
+
+            <!-- AI Search Results Recommendations -->
+            <div v-if="aiSnomedResults.length > 0 && !snomedSearchTerm" class="mt-1 p-3 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-800/50 rounded-lg">
+              <div class="space-y-1">
+                <div
+                  v-for="res in aiSnomedResults"
+                  :key="res.snomed_concept_id"
+                  class="flex items-center justify-between p-2.5 bg-white dark:bg-gray-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 shadow-sm rounded-md border border-indigo-50 dark:border-gray-700 hover:border-indigo-300 cursor-pointer transition-all"
+                  @click="selectSnomedAI(res)"
+                >
+                  <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-indigo-900 dark:text-indigo-100 truncate">{{ res.snomed_term }}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                      <p class="text-[10px] text-indigo-600/70 dark:text-indigo-400/70 font-mono">{{ res.snomed_concept_id }}</p>
+                      <UBadge v-if="res.semantic_tag" :label="res.semantic_tag" size="xs" color="indigo" variant="subtle" />
+                    </div>
+                  </div>
+                  <UIcon name="i-tabler-sparkles" class="w-4 h-4 text-indigo-400" />
+                </div>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-3 text-center italic">Hasil ini dianalisis otomatis oleh DeepSeek AI</p>
+            </div>
           </div>
 
           <!-- Selected SNOMED Concept -->
@@ -3360,6 +3438,8 @@ const newMapping = ref({
 const snomedSearchTerm = ref('')
 const snomedSearchResults = ref([] as any[])
 const searchingSnomed = ref(false)
+const searchingSnomedAI = ref(false)
+const aiSnomedResults = ref([] as any[])
 const savingMapping = ref(false)
 
 const conceptTypeOptions = [
@@ -4180,6 +4260,106 @@ function selectSnomedConcept(result: any) {
   
   snomedSearchResults.value = []
   snomedSearchTerm.value = result.snomed_term
+}
+
+/**
+ * Search SNOMED via AI (n8n + DeepSeek)
+ */
+async function searchSnomedAI() {
+  const text = newMapping.value.source_text
+  if (!text) {
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'Peringatan',
+      description: 'Masukkan teks yang ingin dipetakan terlebih dahulu',
+      color: 'yellow'
+    })
+    return
+  }
+
+  searchingSnomedAI.value = true
+  aiSnomedResults.value = []
+
+  try {
+    // URL n8n Anda (Ganti dengan URL Production n8n jika diperlukan)
+    const n8nUrl = 'https://n31.rsiap.my.id/webhook/snomed-ai-search' 
+    
+    const response = await fetch(n8nUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-AI-KEY': 'snomed-ai-123' // Sesuai credential Header Auth di n8n Anda
+      },
+      body: JSON.stringify({
+        text: text,
+        field: currentMappingContext.value?.source_field
+      })
+    })
+
+    if (!response.ok) throw new Error('Gagal menghubungi AI Service')
+    
+    const data = await response.json()
+    console.log('n8n Raw Data:', data)
+    
+    // AI Agent biasanya mengembalikan output di field 'output' atau langsung array
+    let results = Array.isArray(data) ? data : (data.output || data.results || data.data || [])
+
+    // Jika hasil berupa string (sering terjadi pada AI Agent), coba parse ulang
+    if (typeof results === 'string') {
+      try {
+        // Bersihkan markdown code blocks jika ada (misal ```json ... ```)
+        const cleanJson = results.replace(/```json|```/g, '').trim()
+        results = JSON.parse(cleanJson)
+      } catch (e) {
+        console.warn('Gagal parsing string results:', e)
+        results = []
+      }
+    }
+    
+    console.log('Parsed Results:', results)
+
+    
+    if (results.length === 0) {
+      toast.add({
+        icon: 'i-tabler-info-circle',
+        title: 'AI Info',
+        description: 'AI tidak menemukan kode yang cocok',
+        color: 'blue'
+      })
+    } else {
+      aiSnomedResults.value = results
+    }
+  } catch (error) {
+    console.error('AI Search Error:', error)
+    toast.add({
+      icon: 'i-tabler-alert-circle',
+      title: 'AI Error',
+      description: 'Terjadi kesalahan saat mencari via AI',
+      color: 'red'
+    })
+  } finally {
+    searchingSnomedAI.value = false
+  }
+}
+
+/**
+ * Select AI recommended concept
+ */
+function selectSnomedAI(result: any) {
+  newMapping.value.snomed_concept_id = result.snomed_concept_id
+  newMapping.value.snomed_term = result.snomed_term
+  newMapping.value.snomed_fsn = result.snomed_term // Gunakan term jika FSN tidak ada
+  
+  // Matikan list AI agar rapi
+  aiSnomedResults.value = []
+  
+  toast.add({
+    icon: 'i-tabler-sparkles',
+    title: 'AI Selected',
+    description: `Menggunakan saran: ${result.snomed_term}`,
+    color: 'blue',
+    timeout: 1500
+  })
 }
 
 /**
@@ -5040,8 +5220,22 @@ function openAddMappingForSOAP(soap: any, field: string) {
 
   snomedSearchTerm.value = ''
   snomedSearchResults.value = []
+  aiSnomedResults.value = []
 
   openModalAddMapping.value = true
+}
+
+/**
+ * Open add mapping modal and immediately trigger AI search
+ */
+function openAddMappingWithAI(soap: any, field: string) {
+  openAddMappingForSOAP(soap, field)
+  
+  // Set the source text to the full clinical note text
+  newMapping.value.source_text = soap[field]
+  
+  // Immediately trigger AI search
+  searchSnomedAI()
 }
 
 /**
