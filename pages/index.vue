@@ -43,9 +43,8 @@ const { data: dashboard, error, refresh, status } = await useAsyncData<{ message
 
 // watch month value if updated then make a request to update the bupel data
 watch(month, async (newVal) => {
-  const { data, error, status } = await useAsyncData(
-    '/klaim/bupel',
-    () => $fetch(`${config.public.API_V2_URL}/klaim/bupel`, {
+  try {
+    await $fetch(`${config.public.API_V2_URL}/klaim/bupel`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token.accessToken}`,
@@ -55,9 +54,10 @@ watch(month, async (newVal) => {
       body: JSON.stringify({
         bulan: newVal,
       })
-    }),
-    { immediate: true }
-  );
+    })
+  } catch (err) {
+    console.error('Failed to update bupel:', err)
+  }
 });
 
 const colorVariant: Record<string, string> = {

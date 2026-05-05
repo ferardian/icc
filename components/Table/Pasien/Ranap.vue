@@ -180,19 +180,19 @@
               <UBadge size="xs" :color="row.sep_simple?.no_sep ? 'primary' : 'primary'" variant="soft">
                 <div class="flex gap-2 items-center justify-between w-full pl-1">
                   {{ row.sep_simple?.no_sep ?? "-" }}
-                  <template v-if="row.sep_simple?.no_sep && isSupported">
-                    <UButton icon="i-tabler-copy" color="primary" variant="soft" size="2xs"
+                  <ClientOnly>
+                    <UButton v-if="row.sep_simple?.no_sep && isSupported" icon="i-tabler-copy" color="primary" variant="soft" size="2xs"
                       @click="copy(row.sep_simple?.no_sep)" />
-                  </template>
+                  </ClientOnly>
                 </div>
               </UBadge>
 
               <UBadge size="xs" color="sky" variant="soft">
                 <div class="flex gap-2 items-center justify-between w-full pl-1">
                   {{ row.no_rawat ?? "-" }}
-                  <template v-if="row.no_rawat && isSupported">
-                    <UButton icon="i-tabler-copy" color="sky" variant="soft" size="2xs" @click="copy(row.no_rawat)" />
-                  </template>
+                  <ClientOnly>
+                    <UButton v-if="row.no_rawat && isSupported" icon="i-tabler-copy" color="sky" variant="soft" size="2xs" @click="copy(row.no_rawat)" />
+                  </ClientOnly>
                 </div>
               </UBadge>
             </div>
@@ -489,7 +489,7 @@ import { determineStatus } from '~/common/helpers/statusHelper';
 import { setStatus } from '~/common/helpers/statusHelper';
 
 const buildUrl = (noRawat: string) => `/sep/${btoa(noRawat)}`
-const buildUrlErm = (noRawat: string) => `/erm/${btoa(noRawat)}`
+const buildUrlErm = (noRawat: string, noSep?: string) => noSep ? `/erm/${btoa(noRawat)}?sep=${noSep}` : `/erm/${btoa(noRawat)}`
 
 const sep = ref('')
 const pdfUrl = ref('')
@@ -857,7 +857,16 @@ const rowMenu = (row: any) => {
       icon: 'i-tabler-pig-money',
       disabled: !row?.pasien?.no_rkm_medis,
       click: () => {
-        openNewTab(buildUrlErm(row.pasien?.no_rkm_medis));
+        try {
+          const noRm = row.pasien?.no_rkm_medis;
+          if (noRm) {
+            openNewTab(buildUrlErm(noRm, row.sep_simple?.no_sep));
+          } else {
+            console.error('No RM not found for patient:', row);
+          }
+        } catch (error) {
+          console.error('Error opening ERM page:', error);
+        }
       }
     }],
     [{

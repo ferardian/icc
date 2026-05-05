@@ -83,7 +83,7 @@
 
 <script lang="ts" setup>
 import { useRouter } from 'vue-router'
-import { useDebounceFn } from '@vueuse/core'
+import { refDebounced } from '@vueuse/core'
 
 const magickToken = useAccessTokenStore()
 const magickConfig = useRuntimeConfig()
@@ -94,11 +94,13 @@ const magickKeywords = ref('')
 // get url
 const url = useRoute()
 
+const debouncedMagickKeywords = refDebounced(magickKeywords, 1300)
+
 // Trigger the API request only when `keywords` is not empty
 const { data: magick, error: magickError, refresh: magickRefresh, status: magickStatus } = await useAsyncData(
   'magick-sep/search',
-  useDebounceFn(() => {
-    if (magickKeywords.value.trim() !== '') {
+  () => {
+    if (debouncedMagickKeywords.value.trim() !== '') {
       return $fetch(`${magickConfig.public.API_V2_URL}/sep/search`, {
         method: 'POST',
         headers: {
@@ -107,14 +109,14 @@ const { data: magick, error: magickError, refresh: magickRefresh, status: magick
           ContentType: 'application/json'
         },
         body: JSON.stringify({
-          search: { value: magickKeywords.value }
+          search: { value: debouncedMagickKeywords.value }
         }),
         query: { page: magickCurrentPage.value, limit: 4 }
       })
     }
-    return null
-  }, 1300),
-  { immediate: true, watch: [magickKeywords, magickCurrentPage] }
+    return Promise.resolve({ data: [], meta: { total: 0, per_page: 4 } })
+  },
+  { watch: [debouncedMagickKeywords, magickCurrentPage] }
 );
 
 const parseDate = (date: string) => {

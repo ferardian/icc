@@ -14,23 +14,22 @@ export const useErmBpjsStatus = () => {
   const checkErmBpjsStatus = async (noSep: string): Promise<boolean> => {
     if (!noSep) return false
 
-    console.log(`🔍 Checking ERM BPJS status for SEP: ${noSep}`)
-
+    // Debug console.log removed
     // Check cache first
     if (ermStatusCache.value.has(noSep)) {
       const cachedStatus = ermStatusCache.value.get(noSep) || false
-      console.log(`📦 Found cached status for ${noSep}: ${cachedStatus}`)
+      // console.log(`📦 Found cached status for ${noSep}: ${cachedStatus}`)
       return cachedStatus
     }
 
     // Check if already loading
     if (loadingStatus.value.has(noSep)) {
-      console.log(`⏳ Already loading ${noSep}`)
+      // console.log(`⏳ Already loading ${noSep}`)
       return false
     }
 
     loadingStatus.value.add(noSep)
-    console.log(`🌐 Making API request for ${noSep}`)
+    // console.log(`🌐 Making API request for ${noSep}`)
 
     try {
       const response = await $fetch(`${config.public.API_V2_URL}/bpjs/erm/${noSep}`, {
@@ -56,7 +55,7 @@ export const useErmBpjsStatus = () => {
 
         if (responseCode === 200 || responseCode === '200') {
           ermStatusCache.value.set(noSep, true)
-          console.log(`✅ ERM BPJS status: ${noSep} - Success (HTTP 200)`)
+          // console.log(`✅ ERM BPJS status: ${noSep} - Success (HTTP 200)`)
           return true
         } else {
           console.log(`❌ ERM BPJS status: ${noSep} - Response Code: ${responseCode} (type: ${typeof responseCode})`)
@@ -71,17 +70,17 @@ export const useErmBpjsStatus = () => {
       return false
 
     } catch (error: any) {
-      console.error(`Error checking ERM BPJS status for SEP ${noSep}:`, error)
-
-      // Handle different error scenarios
-      if (!error) {
-        console.error('Unknown error occurred')
+      // Handle 404 (not found) - belum ada data ERM silently
+      if (error.response?.status === 404) {
         ermStatusCache.value.set(noSep, false)
         return false
       }
 
-      // Handle 404 (not found) - belum ada data ERM
-      if (error.response?.status === 404) {
+      // console.error(`Error checking ERM BPJS status for SEP ${noSep}:`, error)
+
+      // Handle different error scenarios
+      if (!error) {
+        // console.error('Unknown error occurred')
         ermStatusCache.value.set(noSep, false)
         return false
       }

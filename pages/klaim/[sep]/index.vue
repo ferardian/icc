@@ -6,9 +6,19 @@
         <template v-if="bridgingSep?.data?.klsnaik">
           <UButton icon="i-heroicons-pencil-square" size="sm" color="yellow" variant="ghost" label="Edit Detail Naik Kelas" @click="openUpdateNaikKelas = true" :trailing="false"/>
         </template>
+        <UButton color="indigo" variant="soft" size="sm" icon="i-heroicons-cpu-chip"
+          :loading="isAnalyzing"
+          @click="triggerAiAnalysis">
+          Analisis AI
+        </UButton>
         <UButton color="indigo" variant="soft" size="sm" icon="i-tabler-file-text"
           @click="openDokumen = true; pdfReady = false">
           Berkas Klaim
+        </UButton>
+        <UButton color="indigo" variant="soft" size="sm" icon="i-tabler-pig-money"
+          :disabled="!bridgingSep?.data.nomr"
+          @click="openNewTab(buildUrlErm(bridgingSep?.data.nomr, bridgingSep?.data.no_sep))">
+          ERM BPJS
         </UButton>
       </div>
     </div>
@@ -120,6 +130,115 @@
   </USlideover>
 
   <ModalUpdateNaikKelas v-model:isOpen="openUpdateNaikKelas" :sep="no_sep" />
+
+  <!-- AI Analysis Result Modal -->
+  <UModal v-model="showAiModal" :ui="{ width: 'sm:max-w-xl' }">
+    <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <UIcon name="i-heroicons-cpu-chip" class="w-6 h-6 text-indigo-500" />
+            <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
+              Hasil Analisis Klaim AI
+            </h3>
+          </div>
+          <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark-20-solid" class="-my-1" @click="showAiModal = false" />
+        </div>
+      </template>
+
+      <div class="space-y-6">
+        <!-- Model Histori RSIA -->
+        <div class="p-4 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl border border-indigo-100 dark:border-indigo-800">
+          <div class="text-center mb-4">
+            <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">Referensi Tarif Histori RSIA</p>
+          </div>
+          
+          <div class="grid grid-cols-3 gap-2">
+            <div class="text-center">
+              <p class="text-[9px] text-gray-500 uppercase mb-1">Kasus Standar</p>
+              <p class="text-[15px] font-black text-gray-800 dark:text-gray-200">{{ formatRupiah(aiResult?.ai_analysis?.histori_model?.baseline || 0) }}</p>
+            </div>
+            <div class="text-center border-x border-indigo-100/50 dark:border-indigo-800/50 px-2">
+              <p class="text-[9px] text-indigo-600 font-bold uppercase mb-1">Kasus Serupa</p>
+              <p class="text-[15px] font-black text-indigo-700 dark:text-indigo-400">{{ formatRupiah(aiResult?.ai_analysis?.histori_model?.mirror || 0) }}</p>
+            </div>
+            <div class="text-center">
+              <p class="text-[9px] text-gray-500 uppercase mb-1">Nilai Tertinggi</p>
+              <p class="text-[15px] font-black text-gray-800 dark:text-gray-200">{{ formatRupiah(aiResult?.ai_analysis?.histori_model?.max || 0) }}</p>
+            </div>
+          </div>
+          
+          <div v-if="aiResult?.ai_analysis?.kode_inacbg_estimasi" class="mt-4 pt-3 border-t border-indigo-100/30 dark:border-indigo-800/30 text-center">
+            <p class="text-[10px] text-indigo-400 font-medium">Prediksi Kode INA-CBG: <span class="font-bold border-b border-indigo-200 dark:border-indigo-800 pb-0.5">{{ aiResult.ai_analysis.kode_inacbg_estimasi }}</span></p>
+          </div>
+        </div>
+
+        <!-- Status & Severity -->
+        <div class="flex flex-col sm:flex-row gap-4">
+          <div class="flex-1 text-center sm:text-left">
+            <h5 class="text-[11px] font-bold text-gray-500 uppercase mb-2 flex items-center gap-2 justify-center sm:justify-start">
+              <UIcon name="i-heroicons-check-circle" :class="aiResult?.ai_analysis?.status_berkas === 'LENGKAP' ? 'text-green-500' : 'text-orange-500'" />
+              Berkas
+            </h5>
+            <UBadge 
+              :color="aiResult?.ai_analysis?.status_berkas === 'LENGKAP' ? 'green' : 'orange'" 
+              variant="subtle"
+              class="px-3 py-1 font-bold uppercase text-[10px]"
+            >
+              {{ aiResult?.ai_analysis?.status_berkas || 'MEMPROSES' }}
+            </UBadge>
+          </div>
+          <div class="flex-1 text-center sm:text-left">
+            <h5 class="text-[11px] font-bold text-gray-500 uppercase mb-2 flex items-center gap-2 justify-center sm:justify-start">
+              <UIcon name="i-heroicons-shield-check" class="text-indigo-500" />
+              Severity Level
+            </h5>
+            <UBadge color="indigo" variant="subtle" class="px-3 py-1 font-bold uppercase text-[10px]">
+              {{ aiResult?.ai_analysis?.severity_level || 'Level I' }}
+            </UBadge>
+          </div>
+        </div>
+
+        <!-- Faktor Penambah Nilai -->
+        <div v-if="aiResult?.ai_analysis?.faktor_penambah?.length" class="p-3 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg border border-indigo-100/50 dark:border-indigo-800/50">
+          <h5 class="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-2">Analisa Keparahan:</h5>
+          <div class="flex flex-wrap gap-2">
+            <template v-for="(factor, idx) in aiResult.ai_analysis.faktor_penambah" :key="idx">
+              <span class="text-[11px] px-2 py-0.5 bg-white dark:bg-gray-800 rounded border border-indigo-100 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400">
+                + {{ factor }}
+              </span>
+            </template>
+          </div>
+        </div>
+
+        <!-- Dokumen yang Kurang -->
+        <div v-if="aiResult?.ai_analysis?.dokumen_kurang?.length">
+          <h5 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Dokumen Perlu Dilengkapi:</h5>
+          <ul class="space-y-1">
+            <li v-for="(doc, idx) in aiResult.ai_analysis.dokumen_kurang" :key="idx" class="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <span class="mt-1 w-1.5 h-1.5 rounded-full bg-red-400 shrink-0"></span>
+              {{ doc }}
+            </li>
+          </ul>
+        </div>
+
+        <!-- Catatan AI -->
+        <div>
+          <h5 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Catatan Analisa:</h5>
+          <div class="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700 text-sm leading-relaxed text-gray-600 dark:text-gray-400 italic">
+            "{{ aiResult?.ai_analysis?.catatan || 'Tidak ada catatan khusus.' }}"
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="flex justify-end gap-3">
+          <UButton color="gray" variant="ghost" @click="showAiModal = false">Tutup</UButton>
+          <UButton color="indigo" @click="triggerAiAnalysis" :loading="isAnalyzing">Analisis Ulang</UButton>
+        </div>
+      </template>
+    </UCard>
+  </UModal>
 </template>
 
 <script lang="ts" setup>
@@ -134,8 +253,67 @@ const openDokumen = ref(false);
 const config = useRuntimeConfig();
 const no_sep = ref(route.params.sep);
 const openUpdateNaikKelas = ref(false);
+const isAnalyzing = ref(false);
+const showAiModal = ref(false);
+const aiResult = ref<any>(null);
 const tokenStore = useAccessTokenStore();
 const pdfUrl = `${config.public.API_V2_URL}/sep/${no_sep.value}/print?token=${tokenStore.accessToken}`;
+
+const buildUrlErm = (noRm: string, noSep?: string) => noSep ? `/erm/${btoa(noRm)}?sep=${noSep}` : `/erm/${btoa(noRm)}`;
+const openNewTab = (url: string) => {
+  window.open(url, '_blank');
+};
+
+const triggerAiAnalysis = async () => {
+  if (!bridgingSep.value?.data?.no_rawat) {
+    toast.add({
+      title: 'Data Tidak Lengkap',
+      description: 'Nomor rawat tidak ditemukan dalam data SEP.',
+      color: 'orange'
+    });
+    return;
+  }
+
+  // Cek apakah diagnosa sudah terisi
+  if (!allData.value.diagnosa?.data || allData.value.diagnosa.data.length === 0) {
+    toast.add({
+      title: 'Diagnosa Kosong',
+      description: 'Silakan isi Diagnosa Utama terlebih dahulu sebelum melakukan analisa AI.',
+      color: 'orange'
+    });
+    return;
+  }
+
+  isAnalyzing.value = true;
+  try {
+    const rawat = bridgingSep.value.data.no_rawat;
+    const response = await $fetch<any>(`${config.public.API_V2_URL}/eklaim/analisis/${btoa(rawat)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tokenStore.accessToken}` }
+    });
+
+    if (response?.success) {
+      aiResult.value = { ai_analysis: response.message };
+      showAiModal.value = true;
+      toast.add({
+        title: 'Analisis Selesai',
+        description: 'Klaim Anda telah dianalisis oleh AI.',
+        color: 'green'
+      });
+    } else {
+      throw new Error(response?.message || 'Gagal melakukan analisis AI');
+    }
+  } catch (err: any) {
+    console.error('AI Analysis Error:', err);
+    toast.add({
+      title: 'Gagal Analisis',
+      description: err.data?.message || err.message || 'Terjadi kesalahan saat menghubungi server AI.',
+      color: 'red'
+    });
+  } finally {
+    isAnalyzing.value = false;
+  }
+};
 
 const setTotalTarifRs = (tarif: number) => {
   totalTarifRs.value = tarif;

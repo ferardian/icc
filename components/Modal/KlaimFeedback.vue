@@ -238,7 +238,7 @@ const { data: logs, error, refresh: refreshLog } = await useAsyncData(
         },
       });
     }
-    return Promise.resolve(null); // or some default empty data if needed
+    return Promise.resolve({ data: [] }); // or some default empty data if needed
   },
   {
     watch: [() => props.sep, () => localIsOpen.value],

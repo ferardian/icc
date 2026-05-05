@@ -20,7 +20,7 @@ const openModalLoading = ref(false)
 const openModalKlaimFeedback = ref(false)
 
 const buildUrl = (noRawat: string) => `/sep/${btoa(noRawat)}`
-const buildUrlErm = (noRawat: string) => `/erm/${btoa(noRawat)}`
+const buildUrlErm = (noRawat: string, noSep?: string) => noSep ? `/erm/${btoa(noRawat)}?sep=${noSep}` : `/erm/${btoa(noRawat)}`
 const { text, copy, copied, isSupported } = useClipboard({ source: ref('') })
 
 const virtualElement = ref({ getBoundingClientRect: () => ({}) })
@@ -174,7 +174,7 @@ const rowMenu = (row: any) => {
         try {
           const noRm = row.pasien?.no_rkm_medis;
           if (noRm) {
-            openNewTab(buildUrlErm(noRm));
+            openNewTab(buildUrlErm(noRm, row.no_sep));
           } else {
             console.error('No RM not found for patient:', row);
           }
@@ -435,9 +435,9 @@ const rowMenu = (row: any) => {
             <UBadge :color="row.no_sep ? 'primary' : 'primary'" variant="soft">
               <div class="flex gap-2 items-center justify-between w-full pl-1">
                 {{ row.no_sep ?? "-" }}
-                <template v-if="row.no_sep && isSupported">
-                  <UButton icon="i-tabler-copy" color="primary" variant="soft" size="2xs" @click="copy(row.no_sep)" />
-                </template>
+                <ClientOnly>
+                  <UButton v-if="row.no_sep && isSupported" icon="i-tabler-copy" color="primary" variant="soft" size="2xs" @click="copy(row.no_sep)" />
+                </ClientOnly>
               </div>
             </UBadge>
           </div>
@@ -446,9 +446,9 @@ const rowMenu = (row: any) => {
           <UBadge color="sky" variant="soft">
             <div class="flex gap-2 items-center justify-between w-full pl-1">
               {{ row.no_rawat ?? "-" }}
-              <template v-if="row.no_rawat && isSupported">
-                <UButton icon="i-tabler-copy" color="sky" variant="soft" size="2xs" @click="copy(row.no_rawat)" />
-              </template>
+              <ClientOnly>
+                <UButton v-if="row.no_rawat && isSupported" icon="i-tabler-copy" color="sky" variant="soft" size="2xs" @click="copy(row.no_rawat)" />
+              </ClientOnly>
             </div>
           </UBadge>
         </div>

@@ -262,7 +262,7 @@
                       @click="() => refreshErmStatus(row.no_sep)"
                       size="xs"
                       color="gray"
-                      variant="subtle"
+                      variant="soft"
                       :loading="isLoading(row.no_sep)"
                       class="text-xs">
                       <UIcon name="i-tabler-refresh" class="h-3 w-3" />
@@ -336,9 +336,10 @@
               <div class="flex gap-2">
                 <UButton
                   v-if="row.hasClaim"
-                  icon="i-tabler-file-text"
-                  label="Detail"
-                  color="emerald"
+                  :icon="selectedVisitData?.no_sep === row.no_sep ? 'i-tabler-folder-open' : 'i-tabler-file-text'"
+                  :label="selectedVisitData?.no_sep === row.no_sep ? 'Opened' : 'Detail'"
+                  :color="selectedVisitData?.no_sep === row.no_sep ? 'indigo' : 'emerald'"
+                  :variant="selectedVisitData?.no_sep === row.no_sep ? 'solid' : 'solid'"
                   size="xs"
                   @click="handleRowClick(row)"
                 />
@@ -921,7 +922,7 @@
                 <div class="flex items-center gap-2 mb-2">
                   <UIcon name="i-tabler-bug" class="w-4 h-4 text-gray-600 dark:text-gray-400" />
                   <span class="font-semibold text-gray-700 dark:text-gray-300">Debug Info</span>
-                  <UBadge label="Check Console" color="orange" variant="soft" size="2xs" />
+                  <UBadge label="Check Console" color="orange" variant="soft" size="xs" />
                 </div>
                 <div class="space-y-1 text-gray-600 dark:text-gray-400">
                   <p>Total SOAP mappings loaded: {{ soapMappings.length }}</p>
@@ -933,7 +934,7 @@
                         :label="`${getSOAPMappings(soap, fieldName).length} mappings`"
                         :color="getSOAPMappings(soap, fieldName).length > 0 ? 'green' : 'red'"
                         variant="soft"
-                        size="2xs"
+                        size="xs"
                       />
                     </p>
                   </div>
@@ -1119,7 +1120,7 @@
                           :label="`${row.template.satu_sehat_mapping_lab.code} - ${row.template.satu_sehat_mapping_lab.display}`"
                           color="blue"
                           variant="soft"
-                          size="2xs"
+                          size="xs"
                         />
                       </div>
                     </div>
@@ -1471,13 +1472,13 @@
                     <UBadge
                       :label="row.status_rawat"
                       :color="row.status_rawat === 'Ralan' ? 'blue' : 'green'"
-                      size="2xs"
+                      size="xs"
                       variant="soft"
                     />
                     <UBadge
                       :label="row.nama_petugas || row.jenis_petugas"
                       color="gray"
-                      size="2xs"
+                      size="xs"
                       variant="soft"
                     />
                   </div>
@@ -1742,7 +1743,7 @@
         
 
         <!-- CATATAN TAMBAHAN -->
-        <div v-if="visitDetails && visitDetails.cppt_catatan && visitDetails.cppt_catatan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div v-if="visitDetails && visitDetails.cppt_catatan && visitDetails.cppt_catatan.length > 0" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 ml-16 mt-5">
           <div class="bg-gray-50 dark:bg-gray-900/20 px-6 py-4 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
             <div class="flex items-center gap-2">
               <UIcon name="i-tabler-note" class="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -1761,7 +1762,7 @@
         </div>
 
         <!-- INLINE SNOMED SEARCH SECTION -->
-        <div v-if="showSNOMEDSearch" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700">
+        <div v-if="showSNOMEDSearch" class="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 ml-16 mt-5">
           <div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 rounded-t-xl border-b border-blue-200 dark:border-blue-800">
             <div class="flex justify-between items-center">
               <div class="flex items-center gap-2">
@@ -2311,7 +2312,7 @@
                             :label="result.semantic_tag"
                             color="blue"
                             variant="soft"
-                            size="2xs"
+                            size="xs"
                           />
                         </div>
                         <p v-if="result.snomed_fsn" class="text-xs text-gray-400 mt-1 italic">{{ result.snomed_fsn }}</p>
@@ -2819,7 +2820,7 @@
                               <UBadge
                                 :label="getParameterStatus(detail)"
                                 :color="getParameterStatusColor(detail)"
-                                size="2xs"
+                                size="xs"
                                 variant="soft"
                               />
                             </div>
@@ -2958,7 +2959,8 @@ const props = defineProps({
   data: { required: true, type: Object },
   refresh: { type: Function, required: true },
   status: { type: String, required: true },
-  pending: { type: Boolean, default: false }
+  pending: { type: Boolean, default: false },
+  initialSep: { type: String, required: false }
 })
 
 const config = useRuntimeConfig()
@@ -3091,6 +3093,16 @@ watch(() => props.data, async (newData) => {
         newStatus[noSep] = status
       })
       ermBpjsStatus.value = { ...newStatus }
+    }
+    
+    // Auto trigger detail selection if initialSep is provided
+    if (props.initialSep && !selectedVisitData.value) {
+      const targetRow = newData.data.find((r: any) => r.no_sep === props.initialSep)
+      if (targetRow) {
+        nextTick(() => {
+          handleRowClick(targetRow)
+        })
+      }
     }
   }
 }, { immediate: true, deep: true })
@@ -9451,6 +9463,51 @@ async function generateBPJSMedicalRecordBundle() {
         jnsPelayanan = '1';
     }
 
+    const bridgingSep = visitDetails.value?.bridging_sep;
+    const currentKdPoli = bridgingSep?.kdpolitujuan || data.kd_poli || visitDetails.value?.reg_periksa?.kd_poli || '';
+    const currentPoliMapping: { [key: string]: string } = {
+      'IGDK': 'Instalasi Gawat Darurat',
+      'IGD': 'Instalasi Gawat Darurat',
+      'RI': 'Radiologi',
+      'RAD': 'Radiologi',
+      'LAB': 'Laboratorium',
+      'INT': 'Penyakit Dalam',
+      'OBG': 'Obstetri dan Ginekologi',
+      'ANO': 'Anak',
+      'BED': 'Bedah',
+      'MAT': 'Maternal',
+      'PAR': 'Paru',
+      'JAN': 'Jantung',
+      'SAR': 'Saraf',
+      'KUL': 'Kulit dan Kelamin',
+      'THT': 'Telinga Hidung Tenggorokan',
+      'MATA': 'Mata',
+      'GIGI': 'Gigi dan Mulut',
+      'ORTH': 'Ortopedi',
+      'PSI': 'Psikiatri',
+      'REH': 'Rehabilitasi Medik',
+      'UMU': 'Poli Umum',
+      'VK': 'Poli Vaksin',
+      'KIA': 'Kesehatan Ibu dan Anak',
+      'GIZI': 'Gizi',
+      'FISIO': 'Fisioterapi'
+    };
+    const mappedPoliName = currentKdPoli ? (currentPoliMapping[currentKdPoli] || '') : '';
+    const currentPoliName = bridgingSep?.nmpolitujuan || visitDetails.value?.poli?.nm_poli || data.nm_poli || mappedPoliName || 'Poli';
+    
+    // Handle kamar_inap as object based on API response
+    const kamarInap = Array.isArray(visitDetails.value?.kamar_inap) 
+      ? visitDetails.value.kamar_inap[0] 
+      : visitDetails.value?.kamar_inap;
+
+    const nmBangsal = kamarInap?.kamar?.bangsal?.nm_bangsal || kamarInap?.bangsal?.nm_bangsal || data.nm_bangsal || 'Bangsal';
+    const kdBangsal = kamarInap?.kamar?.bangsal?.kd_bangsal || kamarInap?.kd_bangsal || data.kd_bangsal || 'BANGSAL';
+
+    let unitName = jnsPelayanan === '1' ? nmBangsal : currentPoliName;
+    let unitAlias = jnsPelayanan === '1' ? kdBangsal : currentKdPoli;
+    if (!unitName) unitName = namaRumahSakit;
+    if (!unitAlias) unitAlias = namaRumahSakit;
+
     const now = new Date();
     let startDate = now;
     if (data.tgl_registrasi && data.jam_reg) {
@@ -9555,7 +9612,8 @@ async function generateBPJSMedicalRecordBundle() {
     // --- 2. ORGANIZATIONS ---
     const organizations = [
       {
-        name: namaRumahSakit,
+        name: unitName,
+        alias: [unitAlias],
         id: organizationId
       }
     ];
@@ -9593,7 +9651,7 @@ async function generateBPJSMedicalRecordBundle() {
           }
         ],
         name: org.name,
-        alias: [namaRumahSakit],
+        alias: org.alias,
         telecom: [
           {
             system: "phone",
@@ -9912,7 +9970,8 @@ async function generateBPJSMedicalRecordBundle() {
                 reference: `Practitioner/${practitionerId}`
               },
               onBehalfOf: {
-                reference: `Organization/${organizationId}`
+                reference: `Organization/${organizationId}`,
+                display: namaRumahSakit
               }
             },
             "meta": { "lastUpdated": endTime }
@@ -9997,7 +10056,8 @@ async function generateBPJSMedicalRecordBundle() {
             reference: `Practitioner/${practitionerId}`
           },
           onBehalfOf: {
-            reference: `Organization/${organizationId}`
+            reference: `Organization/${organizationId}`,
+            display: namaRumahSakit
           }
         },
         "meta": {
@@ -10612,7 +10672,7 @@ async function generateBPJSMedicalRecordBundle() {
             },
             performer: [{
               reference: `Organization/${organizationId}`,
-              display: namaRumahSakit
+              display: 'Laboratorium'
             }],
             result: observations
           };
@@ -10748,7 +10808,7 @@ async function generateBPJSMedicalRecordBundle() {
           issued: radioItem.tgl_periksa || new Date().toISOString().split('T')[0],
           performer: [{
             reference: `Organization/${organizationId}`,
-            display: organizationName || 'Rumah Sakit'
+            display: 'Radiologi'
           }],
           result: [radiologyObservation]
         };

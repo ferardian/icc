@@ -7,7 +7,7 @@
         <p class="text-gray-600">Loading...</p>
       </div>
     </div>
-    <TableDataErm v-else :data="data" :refresh="onRefresh" :status="status" :pending="pending" />
+    <TableDataErm v-else :data="data" :refresh="onRefresh" :status="status" :pending="pending" :initial-sep="route.query.sep ? String(route.query.sep) : undefined" />
   </ClientOnly>
 </template>
 
