@@ -42,7 +42,12 @@ const fetchData = async <T>(
   mapFn: (item: T) => { value: string; label: string }
 ): Promise<{ value: string; label: string }[]> => {
   try {
-    const data = await $fetch<T[]>(url);
+    const config = useRuntimeConfig()
+    const baseURL = config.app.baseURL || '/'
+    // Ensure url starts with baseURL and avoid double slashes
+    const fixedUrl = `${baseURL}${url}`.replace(/\/+/g, '/')
+    
+    const data = await $fetch<T[]>(fixedUrl);
 
     if (!data) {
       return [];

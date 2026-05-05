@@ -74,9 +74,9 @@ export const moveItemInArray = (arr: any[], from: number, to: number) => {
 
 // Ambil Data DPJP
 export const fetchDpjp = async (runtimeConfig: any, tokenStore: any) => {
-  return useAsyncData(`${runtimeConfig.public.API_V2_URL}/dokter/search`,
+  return useAsyncData(`${runtimeConfig.public.API_V2_URL}/public/dokter/search`,
     useDebounceFn(() =>
-      $fetch(`${runtimeConfig.public.API_V2_URL}/dokter/search`, {
+      $fetch(`${runtimeConfig.public.API_V2_URL}/public/dokter/search`, {
         method: 'POST',
         query: { limit: 100 },
         headers: {
