@@ -2290,7 +2290,7 @@ function getProsedurPayload() {
             <UFormGroup label="Kelas Hak" name="kelas_rawat" class="min-w-[250px]">
               <URadioGroup v-model="state.kelas_rawat" :loading="optionLoading" value-attribute="value"
               :options="[{ value: 3, label: 'Kelas 3' }, { value: 2, label: 'Kelas 2' }, { value: 1, label: 'Kelas 1' }]"
-              :ui="{ fieldset: 'flex flex-row gap-4' }" disabled />
+              :ui="{ fieldset: 'flex flex-row gap-4' }" />
             </UFormGroup>
           </div>
           <div v-else="">
