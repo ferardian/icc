@@ -57,62 +57,12 @@
           :refreshLatestKlaim="refreshLatestKlaim" 
           :setTotalTarifRs="setTotalTarifRs"
           :setIsVip="setIsVip"
+          :naikKelas="(klaimData?.data as any)?.naik_kelas ?? null"
+          @openEditNaikKelas="openUpdateNaikKelas = true"
         />
       </ClientOnly>
     </UCard>
 
-    <template v-if="klaimData?.data">
-      <UCard class="mb-5">
-        <!-- <template #header>
-          <div class="w-full flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-indigo-500">Hasil Klaim Terakhir</h2>
-
-            <template v-if="bridgingSep?.data?.klsnaik">
-              <UButton icon="i-heroicons-pencil-square" size="sm" color="yellow" variant="ghost" label="Edit Detail Naik Kelas" @click="openUpdateNaikKelas = true" :trailing="false"/>
-            </template>
-          </div>
-        </template> -->
-
-        <!-- show 3 information, code cbg, deskripsi dan tarif -->
-        <!-- <div class="flex flex-col xl:flex-row gap-5 items-stretch">
-          <div class="">
-            <h3 class="text-sm font-semibold text-indigo-500 mb-1">CBG</h3>
-            <UBadge color="sky" variant="subtle" class="text-sm">
-              {{ klaimData?.data?.code_cbg }}
-            </UBadge>
-          </div>
-          <div class="flex-1">
-            <h3 class="text-sm font-semibold text-indigo-500 mb-1">Deskripsi</h3>
-            <p>{{ klaimData?.data?.deskripsi }}</p>
-          </div>
-          <div class="">
-            <h3 class="text-sm font-semibold text-indigo-500 mb-1">Tarif</h3>
-            <p>{{ klaimData?.data?.tarif ? formatRupiah(klaimData?.data?.tarif) : '-' }}</p>
-          </div>
-        </div> -->
-
-        <template v-if="isVip && totalTarifRs && totalTarifRs < klaimData?.data?.tarif && !(klaimData?.data as any)?.naik_kelas">
-          <UDivider class="my-5" label="Tambahan Biaya" />
-          <p class="text-red-500">Tambahan biaya tidak berlaku, karena total tarif RS lebih kecil dari tarif klaim ({{ formatRupiah(totalTarifRs) }} < {{ formatRupiah(klaimData?.data?.tarif) }})</p>
-        </template>
-
-        <template v-if="(klaimData?.data as any)?.naik_kelas">
-          <UDivider class="my-5" label="Tambahan Biaya" />
-
-          <div class="flex flex-col xl:flex-row justify-between">
-            <div class="font-mono">
-              {{ formatRupiah((klaimData?.data as any)?.naik_kelas.tarif_1) }} - {{ formatRupiah((klaimData?.data as any)?.naik_kelas.tarif_2) }} 
-              <template v-if="(klaimData?.data as any)?.naik_kelas.presentase > 0">
-                + ( {{ formatRupiah((klaimData?.data as any)?.naik_kelas.tarif_1) }} x {{ (klaimData?.data as any)?.naik_kelas.presentase }}% )
-              </template>
-            </div>
-            <div class="">
-              = {{ formatRupiah((klaimData?.data as any)?.naik_kelas.tarif_akhir) }}
-            </div>
-          </div>
-        </template>
-      </UCard>
-    </template>
 
   </UContainer>
 

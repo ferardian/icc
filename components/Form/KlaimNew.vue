@@ -274,7 +274,7 @@ const selectedSpecialDrug = ref('');
   const openModalSync = ref(false);
   const runtimeConfig = useRuntimeConfig()
   const tokenStore = useAccessTokenStore()
-  const { sep, regPeriksa, kamarInap, billing, diagnosa, prosedur, tensi, sudahDiGrouping, refreshLatestKlaim, setTotalTarifRs, setIsVip } = defineProps<{
+  const { sep, regPeriksa, kamarInap, billing, diagnosa, prosedur, tensi, sudahDiGrouping, refreshLatestKlaim, setTotalTarifRs, setIsVip, naikKelas } = defineProps<{
     sep?: SepData
     regPeriksa?: RegPeriksa,
     kamarInap?: KamarInap
@@ -287,7 +287,12 @@ const selectedSpecialDrug = ref('');
     
     refreshLatestKlaim: () => void,
     setTotalTarifRs: (tarif: number) => void,
-    setIsVip: (vip: boolean) => void
+    setIsVip: (vip: boolean) => void,
+    naikKelas?: any
+  }>();
+
+  const emit = defineEmits<{
+    openEditNaikKelas: []
   }>();
   
   // bikin state lokal (reactive)
@@ -3108,6 +3113,33 @@ function getProsedurPayload() {
                       {{ groupingData.status }}
                   </td>
               </tr>
+
+              <!-- Tambahan Biaya Naik Kelas -->
+              <template v-if="naikKelas">
+                  <tr>
+                      <td colspan="3" class="px-6 py-2 text-xs font-semibold text-center text-gray-500 dark:text-gray-400 bg-yellow-50 dark:bg-yellow-900/20 border-t border-b border-yellow-200 dark:border-yellow-800">
+                          Tambahan Biaya Yang Dibayar Pasien Untuk Naik/Turun Kelas {{ naikKelas.jenis_naik?.replace('Naik ', '').replace(' Kelas', '') }}
+                      </td>
+                      <td class="px-6 py-2 bg-yellow-50 dark:bg-yellow-900/20 border-t border-b border-yellow-200 dark:border-yellow-800 text-right">
+                          <UButton icon="i-heroicons-pencil-square" size="2xs" color="yellow" variant="ghost" label="Edit" @click="emit('openEditNaikKelas')" :trailing="false" />
+                      </td>
+                  </tr>
+                  <tr>
+                      <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Tambahan Biaya</td>
+                      <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-3/5 font-mono">
+                          Rp {{ formatNumber(naikKelas.tarif_1) }} - Rp {{ formatNumber(naikKelas.tarif_2) }}
+                          <template v-if="naikKelas.presentase > 0">
+                            + (Rp {{ formatNumber(naikKelas.tarif_1) }} × {{ naikKelas.presentase }}%)
+                          </template>
+                      </td>
+                      <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-[10%] text-right font-mono text-gray-400">= Rp</td>
+                      <td class="px-6 py-2 text-sm font-semibold text-gray-900 dark:text-gray-200 w-1/5 text-right font-mono">{{ formatNumber(naikKelas.tarif_akhir) }}</td>
+                  </tr>
+                  <tr>
+                      <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Pembayar Selisih Biaya</td>
+                      <td colspan="3" class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">Peserta</td>
+                  </tr>
+              </template>
           </tbody>
       </table>
       
@@ -3409,6 +3441,35 @@ function getProsedurPayload() {
       <span class="w-48 text-gray-500 dark:text-gray-400">Status</span>
       <span class="font-medium text-gray-800 dark:text-gray-100">normal</span>
     </div>
+
+    <!-- Tambahan Biaya Naik Kelas (INACBG section) -->
+    <template v-if="naikKelas">
+      <div class="px-4 py-2 flex items-center justify-between bg-yellow-50 dark:bg-yellow-900/20 border-t border-b border-yellow-200 dark:border-yellow-800">
+        <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 flex-1 text-center">
+          Tambahan Biaya Yang Dibayar Pasien Untuk Naik/Turun Kelas {{ naikKelas.jenis_naik?.replace('Naik ', '').replace(' Kelas', '') }}
+        </span>
+        <UButton icon="i-heroicons-pencil-square" size="2xs" color="yellow" variant="ghost" label="Edit" @click="emit('openEditNaikKelas')" :trailing="false" />
+      </div>
+      <div class="px-4 py-3 flex items-center">
+        <span class="w-48 text-gray-500 dark:text-gray-400">Tambahan Biaya</span>
+        <div class="flex-1 flex justify-between items-center">
+          <span class="font-mono text-sm text-gray-700 dark:text-gray-300">
+            Rp {{ formatNumber(naikKelas.tarif_1) }} - Rp {{ formatNumber(naikKelas.tarif_2) }}
+            <template v-if="naikKelas.presentase > 0">
+              + (Rp {{ formatNumber(naikKelas.tarif_1) }} × {{ naikKelas.presentase }}%)
+            </template>
+          </span>
+          <div class="flex items-center gap-2 text-right">
+            <span class="font-mono text-gray-500">= Rp</span>
+            <span class="w-32 font-semibold text-gray-800 dark:text-gray-100 text-right font-mono">{{ formatNumber(naikKelas.tarif_akhir) }}</span>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-3 flex items-center">
+        <span class="w-48 text-gray-500 dark:text-gray-400">Pembayar Selisih Biaya</span>
+        <span class="font-medium text-gray-800 dark:text-gray-100">Peserta</span>
+      </div>
+    </template>
 
   </div>
   </div>

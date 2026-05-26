@@ -24,24 +24,24 @@
           </UFormGroup>
 
           <UFormGroup label="Jenis Naik Kelas" name="jenis_naik">
-            <UInput placeholder="Jenis Naik Kelas" class="bg-gray-600 rounded-lg" disabled v-model="state.jenis_naik" />
+            <UInput placeholder="Jenis Naik Kelas" disabled v-model="state.jenis_naik" />
           </UFormGroup>
 
           <div class="grid grid-cols-2 gap-3 w-full">
             <UFormGroup class="w-full" label="Tarif 1" name="tarif_1">
-              <UInput type="number" placeholder="Tarif 1" class="bg-gray-600 rounded-lg" disabled v-model="state.tarif_1" />
+              <UInput type="number" placeholder="Tarif 1" v-model="state.tarif_1" />
             </UFormGroup>
 
             <UFormGroup class="w-full" label="Tarif 2" name="tarif_2">
-              <UInput type="number" placeholder="Tarif 2" class="bg-gray-600 rounded-lg" disabled v-model="state.tarif_2" />
+              <UInput type="number" placeholder="Tarif 2" v-model="state.tarif_2" />
             </UFormGroup>
             
             <UFormGroup class="w-full" label="Presentase (%)" name="presentase">
-              <UInput type="number" placeholder="Presentase" class="bg-gray-600 rounded-lg" disabled v-model="state.presentase" />
+              <UInput type="number" placeholder="Presentase" v-model="state.presentase" />
             </UFormGroup>
   
             <UFormGroup class="w-full" label="Tarif Akhir" name="tarif_akhir">
-              <UInput type="number" placeholder="Tarif Akhir" class="bg-gray-600 rounded-lg" disabled v-model="state.tarif_akhir" />
+              <UInput type="number" placeholder="Tarif Akhir" v-model="state.tarif_akhir" />
             </UFormGroup>
           </div>
 
@@ -147,7 +147,13 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     const response = await $fetch(`${config.public.API_V2_URL}/naik-kelas/${props.sep}`, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${tokenStore.accessToken}` },
-      body: JSON.stringify({ diagnosa: event.data.diagnosa }),
+      body: JSON.stringify({
+        diagnosa: event.data.diagnosa,
+        tarif_1: event.data.tarif_1,
+        tarif_2: event.data.tarif_2,
+        presentase: event.data.presentase,
+        tarif_akhir: event.data.tarif_akhir,
+      }),
     });
 
     if (response?.data?.no_sep) {
