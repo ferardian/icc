@@ -1340,6 +1340,40 @@ const finalGrouper = async () => {
   }
 }
 
+const isSyncingStatus = ref(false)
+
+const syncStatusFromWs = async () => {
+  isSyncingStatus.value = true
+  try {
+    if (!sep?.no_sep) {
+      throw new Error("Nomor SEP tidak ada, silakan cek kembali data pasien")
+    }
+
+    const response: any = await $fetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/idrg/${sep.no_sep}/sync`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          Accept: "application/json",
+        },
+        method: "POST",
+      }
+    )
+
+    addToaster("Success", response.message || "Sinkronisasi status berhasil", "green", "i-tabler-discount-check-filled")
+    
+    // Refresh page to reload all state & component data
+    setTimeout(() => {
+      window.location.reload()
+    }, 1500)
+
+  } catch (e: any) {
+    addToaster("Error", e.data?.message || e.message || "Gagal melakukan sinkronisasi status", "red", "i-tabler-info-circle-filled")
+  } finally {
+    isSyncingStatus.value = false
+  }
+}
+
 const editUlangIdrg = async () => {
   isReeditLoading.value = true
   try {
@@ -2250,7 +2284,17 @@ function getProsedurPayload() {
           <UInput placeholder="nomor peserta" v-model="state.nomor_kartu" :readonly="true" />
         </UFormGroup>
         <UFormGroup label="No. SEP" name="nomor_sep" class="w-full">
-          <UInput placeholder="nomor sep" v-model="state.nomor_sep" :readonly="true" />
+          <div class="flex gap-2">
+            <UInput placeholder="nomor sep" v-model="state.nomor_sep" :readonly="true" class="flex-1" />
+            <UButton 
+              color="orange" 
+              variant="soft" 
+              icon="i-heroicons-arrow-path" 
+              :loading="isSyncingStatus" 
+              @click="syncStatusFromWs" 
+              title="Sinkronkan status tahapan dengan E-Klaim WS"
+            />
+          </div>
         </UFormGroup>
         <UFormGroup label="COB" name="cob_cd" class="w-full">
           <USelectMenu v-model="state.cob_cd" :loading="optionLoading" value-attribute="value" :options="cobOptions"
