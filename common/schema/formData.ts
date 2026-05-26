@@ -73,4 +73,5 @@ export const FormDataSchema = z.object({
   partus: z.string().optional().nullable (),
   abortus: z.string().optional().nullable(),
   onset_kontraksi: z.enum(['spontan', 'induksi', 'non_spontan_non_induksi']).optional().nullable(),
+  kantong_darah: z.union([z.string(), z.number()]).optional().nullable(),
 })

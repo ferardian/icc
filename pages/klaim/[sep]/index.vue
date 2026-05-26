@@ -3,7 +3,7 @@
     <div class="flex justify-between items-center mb-5">
       <h1 class="text-2xl font-semibold text-indigo-500">Form Klaim</h1>
       <div class="flex items-center space-x-2">
-        <template v-if="bridgingSep?.data?.klsnaik">
+        <template v-if="bridgingSep?.data?.klsnaik && (klaimData?.data as any)?.naik_kelas">
           <UButton icon="i-heroicons-pencil-square" size="sm" color="yellow" variant="ghost" label="Edit Detail Naik Kelas" @click="openUpdateNaikKelas = true" :trailing="false"/>
         </template>
         <UButton color="indigo" variant="soft" size="sm" icon="i-heroicons-cpu-chip"
@@ -91,7 +91,7 @@
           </div>
         </div> -->
 
-        <template v-if="isVip && totalTarifRs && totalTarifRs < klaimData?.data?.tarif">
+        <template v-if="isVip && totalTarifRs && totalTarifRs < klaimData?.data?.tarif && !(klaimData?.data as any)?.naik_kelas">
           <UDivider class="my-5" label="Tambahan Biaya" />
           <p class="text-red-500">Tambahan biaya tidak berlaku, karena total tarif RS lebih kecil dari tarif klaim ({{ formatRupiah(totalTarifRs) }} < {{ formatRupiah(klaimData?.data?.tarif) }})</p>
         </template>

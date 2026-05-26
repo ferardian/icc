@@ -34,7 +34,151 @@ const groupingData = reactive({
   drg: '',
   drgCode: '',
   status: 'normal',
+  scriptVersion: '',
+  logicVersion: '',
+  costWeight: '',
+  totalCostWeight: '',
+  nbr: '',
+  totalKlaim: '',
+  groupingDate: '',
+  topupOptions: [] as any[],
+  selectedTopupCode: '',
+  selectedTopupWeight: '-',
 });
+
+const selectedIdrgTopup = ref('');
+const isGroupingIdrgStage2 = ref(false);
+
+const claimDataState = reactive({
+  coderName: '',
+  kelasRawat: '',
+  tarifName: '',
+  tarifCode: '',
+  kantongDarah: 0,
+  kelasRs: '',
+});
+
+const tarifRsLabel = computed(() => {
+  const code = claimDataState.tarifCode || 'CS';
+  const hospitalClass = claimDataState.kelasRs || 'C';
+  
+  let type = 'SWASTA';
+  if (code.endsWith('P')) {
+    type = 'PEMERINTAH';
+  } else if (code.endsWith('S')) {
+    type = 'SWASTA';
+  }
+  
+  return `TARIF RS KELAS ${hospitalClass.toUpperCase()} ${type}`;
+});
+
+const topupTypeLabel = computed(() => {
+  const firstOpt = groupingData.topupOptions?.find(o => o.code);
+  if (!firstOpt) return 'Top-up Option';
+  const type = firstOpt.type || '';
+  if (type.toLowerCase() === 'drug') return 'Top-up Drug';
+  if (type.toLowerCase() === 'prosthesis') return 'Top-up Prosthesis';
+  return 'Top-up ' + type.charAt(0).toUpperCase() + type.slice(1);
+});
+
+const displayTopupWeight = computed(() => {
+  if (!groupingData.selectedTopupWeight || groupingData.selectedTopupWeight === '-') return '-';
+  const val = parseFloat(groupingData.selectedTopupWeight);
+  return isNaN(val) ? '-' : val.toFixed(2);
+});
+
+const displayTotalCostWeight = computed(() => {
+  const cw = parseFloat(groupingData.costWeight || '0');
+  const tw = parseFloat(groupingData.selectedTopupWeight && groupingData.selectedTopupWeight !== '-' ? groupingData.selectedTopupWeight : '0');
+  return (cw + tw).toFixed(2);
+});
+
+const calculatedTotalKlaim = computed(() => {
+  const cw = parseFloat(groupingData.costWeight || '0');
+  const tw = parseFloat(groupingData.selectedTopupWeight && groupingData.selectedTopupWeight !== '-' ? groupingData.selectedTopupWeight : '0');
+  const nbr = parseFloat(groupingData.nbr || '0');
+  if (!nbr) return '';
+  return ((cw + tw) * nbr).toFixed(0);
+});
+
+const runIdrgStage2 = async (topupCode: string) => {
+  if (!sep?.no_sep) return;
+  isGroupingIdrgStage2.value = true;
+  try {
+    const { data: stage2Data, error: stage2Error } = await useFetch(
+      `${runtimeConfig.public.API_V2_URL}/eklaim/${sep.no_sep}/grouping-stage2`,
+      {
+        headers: {
+          Authorization: `Bearer ${tokenStore?.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        method: "POST",
+        body: JSON.stringify({
+          topup_codes: topupCode,
+        }),
+      }
+    );
+
+    if (stage2Error.value) {
+      throw new Error(stage2Error.value.data?.message || "Gagal grouping stage 2 IDRG");
+    }
+
+    console.log("RESPON IDRG STAGE 2 >>>", stage2Data.value);
+    
+    // Parse the response
+    const msg = stage2Data.value?.metadata ? stage2Data.value : stage2Data.value?.message;
+    if (msg?.metadata?.code === 200) {
+      const res = msg.response_idrg;
+      if (res) {
+        groupingData.costWeight = res.cost_weight || '0.00';
+        groupingData.totalCostWeight = res.total_cost_weight || '0.00';
+        groupingData.nbr = res.nbr || '';
+        groupingData.status = res.status_cd || 'normal';
+        
+        // Update selected topup from response
+        groupingData.selectedTopupCode = res.topup?.[0]?.code || '';
+        groupingData.selectedTopupWeight = res.topup?.[0]?.cost_weight || '-';
+        selectedIdrgTopup.value = groupingData.selectedTopupCode;
+
+        if (res.cost_weight && res.nbr) {
+          groupingData.totalKlaim = (parseFloat(res.cost_weight) * parseFloat(res.nbr)).toFixed(0);
+        } else {
+          groupingData.totalKlaim = '';
+        }
+
+        addToaster("Success", "Topup IDRG berhasil diterapkan", "green", "i-tabler-discount-check-filled");
+        refreshLatestKlaim();
+      }
+    }
+  } catch (e: any) {
+    addToaster("Error", e.message, "red", "i-tabler-info-circle-filled");
+  } finally {
+    isGroupingIdrgStage2.value = false;
+  }
+};
+
+watch(selectedIdrgTopup, (newVal) => {
+  if (newVal === groupingData.selectedTopupCode) return;
+  runIdrgStage2(newVal);
+});
+
+const formatIndoDate = (date: Date) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day} ${month} ${year} ${hours}:${minutes}`;
+};
+
+const formatNumber = (num: any) => {
+  if (num === null || num === undefined || num === '') return '';
+  const val = parseFloat(num);
+  if (isNaN(val)) return num;
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(val);
+};
 
 // === STATE UNTUK TOMBOL ===
 const showGroupingButton = ref(true)       // default: tampilkan tombol grouping
@@ -257,6 +401,7 @@ if (dpjp.value?.data && Array.isArray(dpjp.value.data) && dpjp.value.data.length
     partus: null,
     abortus: null,
     onset_kontraksi: sep?.chunk?.onset_kontraksi ?? null,
+    kantong_darah: null,
   })
   console.log("3. Nilai state.kd_dokter setelah diatur:", state.kd_dokter);
   
@@ -360,6 +505,17 @@ console.log("FULL RESPONSE:", JSON.stringify(data.value, null, 2))
         if (claimRes?.metadata?.code === 200) {
           showForm.value = true
           console.log("Showform:",showForm.value)
+          
+          if (claimRes?.response?.data) {
+            const cData = claimRes.response.data
+            claimDataState.coderName = cData.coder_nm || ''
+            claimDataState.kelasRawat = cData.kelas_rawat || ''
+            claimDataState.tarifName = cData.tarif_rs_nm || cData.kode_tarif || ''
+            claimDataState.tarifCode = cData.kode_tarif || ''
+            claimDataState.kelasRs = cData.kelas_rs || ''
+            claimDataState.kantongDarah = cData.kantong_darah ? parseInt(cData.kantong_darah) : 0
+            state.kantong_darah = claimDataState.kantongDarah
+          }
         }
 
         // New logic for grouper_res
@@ -370,7 +526,7 @@ console.log("FULL RESPONSE:", JSON.stringify(data.value, null, 2))
             console.warn("Format JSON grouper_res tidak valid:", e);
         }
 
-        if (grouperRes?.metadata?.code === 200) {
+          if (grouperRes?.metadata?.code === 200) {
             const res = grouperRes.response_idrg;
             if (res) {
                 showGroupingResult.value = true;
@@ -379,8 +535,30 @@ console.log("FULL RESPONSE:", JSON.stringify(data.value, null, 2))
                 groupingData.mdcCode = res.mdc_number;
                 groupingData.drg = res.drg_description;
                 groupingData.drgCode = res.drg_code;
-                groupingData.status = 'normal'; // The JSON indicates a 'normal' status
+                groupingData.status = res.status_cd || 'normal';
                 groupingData.mdcCode = res.mdc_number; // Pastikan mdcCode terisi
+
+                // Populate new fields
+                groupingData.scriptVersion = res.script_version || '';
+                groupingData.logicVersion = res.logic_version || '';
+                groupingData.costWeight = res.cost_weight || '0.00';
+                groupingData.totalCostWeight = res.total_cost_weight || '0.00';
+                groupingData.nbr = res.nbr || '';
+                
+                // Populate topup fields
+                groupingData.topupOptions = res.topup_options || [];
+                groupingData.selectedTopupCode = res.topup?.[0]?.code || '';
+                groupingData.selectedTopupWeight = res.topup?.[0]?.cost_weight || '-';
+                selectedIdrgTopup.value = groupingData.selectedTopupCode;
+                
+                if (res.cost_weight && res.nbr) {
+                    groupingData.totalKlaim = (parseFloat(res.cost_weight) * parseFloat(res.nbr)).toFixed(0);
+                } else {
+                    groupingData.totalKlaim = '';
+                }
+                
+                const updatedDate = data.value.updated_at ? new Date(data.value.updated_at) : new Date();
+                groupingData.groupingDate = formatIndoDate(updatedDate);
 
                 // =======================================================
                 // KONDISI BARU UNTUK MDC NUMBER 36
@@ -390,8 +568,6 @@ console.log("FULL RESPONSE:", JSON.stringify(data.value, null, 2))
                 } else {
                   showFinalButton.value = false;
                 }
-
-                 
             }
         }
 
@@ -471,6 +647,7 @@ if (finalRes?.metadata?.code === 200) {
   // Tampilkan form INACBG
   showFormInacbg.value = true
   showInacbgResult.value = false;
+  groupingData.status = 'final';
 } else {
   // kalau belum final, tetap tampilkan tombol Grouping & Final
   showGroupingButton.value = true
@@ -500,6 +677,7 @@ if (reeditRes?.metadata?.code === 200) {
   // Hide tombol Edit Ulang IDRG
   showEditUlangButton.value = false
   showInacbgResult.value = false;
+  groupingData.status = 'normal';
 }
 
 // Di dalam onMounted, setelah blok parsing 'reeditRes'...
@@ -752,7 +930,8 @@ try {
     // 2. Tampilkan tabel hasil
     showInacbgResult.value = true;
     const optionsSource = stage2Res || stage1Res; 
-    const specialOptions = optionsSource.special_cmg_option;
+    const payloadOpts = optionsSource.message || optionsSource;
+    const specialOptions = payloadOpts.special_cmg_option || (payloadOpts.special_cmg && payloadOpts.special_cmg.special_cmg_option);
     stage1Result.value = stage2Res || stage1Res;
     
     // Reset dan isi ulang daftar pilihan dropdown
@@ -834,6 +1013,26 @@ try {
 
               inacbgResultData.specialProsthesisTariff = tariff;
               inacbgResultData.specialProsthesisCode = cmg.code;
+                break;
+              case 'Special Investigation':
+                const cleanCmgInvCode = cmg.code.replace(/-/g, '').toUpperCase();
+                const invOpt = specialInvestigationOptions.value.find(o => 
+                  o.code && cleanCmgInvCode.includes(o.code.toUpperCase())
+                );
+                if (invOpt) selectedSpecialInvestigation.value = invOpt.code;
+                
+                inacbgResultData.specialInvestigationTariff = tariff;
+                inacbgResultData.specialInvestigationCode = cmg.code;
+                break;
+              case 'Special Drug':
+                const cleanCmgDrugCode = cmg.code.replace(/-/g, '').toUpperCase();
+                const drugOpt = specialDrugOptions.value.find(o => 
+                  o.code && cleanCmgDrugCode.includes(o.code.toUpperCase())
+                );
+                if (drugOpt) selectedSpecialDrug.value = drugOpt.code;
+                
+                inacbgResultData.specialDrugTariff = tariff;
+                inacbgResultData.specialDrugCode = cmg.code;
                 break;
             }
           });
@@ -1253,8 +1452,28 @@ console.log('DEBUG => prosedurPayload', prosedurPayload)
       groupingData.mdcCode = res.mdc_number
       groupingData.drg = res.drg_description
       groupingData.drgCode = res.drg_code
-      groupingData.status = "normal"
+      groupingData.status = res.status_cd || "normal"
       groupingData.mdcCode = res.mdc_number; // Pastikan mdcCode terisi
+
+      // Set new fields
+      groupingData.scriptVersion = res.script_version || ''
+      groupingData.logicVersion = res.logic_version || ''
+      groupingData.costWeight = res.cost_weight || '0.00'
+      groupingData.totalCostWeight = res.total_cost_weight || '0.00'
+      groupingData.nbr = res.nbr || ''
+
+      // Populate topup fields
+      groupingData.topupOptions = res.topup_options || []
+      groupingData.selectedTopupCode = res.topup?.[0]?.code || ''
+      groupingData.selectedTopupWeight = res.topup?.[0]?.cost_weight || '-'
+      selectedIdrgTopup.value = groupingData.selectedTopupCode
+
+      if (res.cost_weight && res.nbr) {
+          groupingData.totalKlaim = (parseFloat(res.cost_weight) * parseFloat(res.nbr)).toFixed(0)
+      } else {
+          groupingData.totalKlaim = ''
+      }
+      groupingData.groupingDate = formatIndoDate(new Date())
   
       // =======================================================
       // KONDISI BARU UNTUK MDC NUMBER 36
@@ -1326,6 +1545,7 @@ const finalGrouper = async () => {
       showEditUlangButton.value = true
       showFormInacbg.value = true
       showInacbgResult.value = false; 
+      groupingData.status = 'final';
     }
 
 
@@ -1405,6 +1625,7 @@ const editUlangIdrg = async () => {
 
     // TAMBAHKAN BARIS DI BAWAH INI
     final_res.value = null; // Reset status final di frontend
+    groupingData.status = 'normal';
 
     addToaster("Success", "Edit ulang IDRG berhasil", "green", "i-tabler-discount-check-filled")
 
@@ -2785,43 +3006,115 @@ function getProsedurPayload() {
 </UButton>
 
 </div>
-<div v-if="showGroupingResult" class="mt-8 border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
+<div v-if="showGroupingResult" class="mt-8 border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm">
       <table class="min-w-full divide-y divide-gray-300 dark:divide-gray-700">
           <thead class="bg-gray-100 dark:bg-gray-800">
               <tr>
-                  <th colspan="2" class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      Hasil Grouping iDRG
+                  <th colspan="4" class="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 capitalize">
+                      Hasil Grouping IDRG - {{ groupingData.status }}
                   </th>
               </tr>
           </thead>
-          <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-  
+          <tbody class="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+              <!-- Info Row -->
               <tr>
-                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/4">Jenis Rawat</td>
-                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Info</td>
+                  <td colspan="3" class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 font-mono">
+                      @ {{ groupingData.groupingDate || formatIndoDate(new Date()) }} - {{ groupingData.scriptVersion || '1.0.26' }} / {{ groupingData.logicVersion || '0.2.1718.202508082251' }}
+                  </td>
+              </tr>
+              
+              <!-- Jenis Rawat Row -->
+              <tr>
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Jenis Rawat</td>
+                  <td colspan="3" class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
                       {{ groupingData.jenisRawat }}
                   </td>
               </tr>
+              
+              <!-- MDC Row -->
               <tr>
-                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium">MDC</td>
-                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
-                      {{ groupingData.mdc }} <span class="float-right font-mono">{{ groupingData.mdcCode }}</span>
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">MDC</td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-3/5">
+                      {{ groupingData.mdc }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-[10%] text-right font-mono">
+                      {{ groupingData.mdcCode }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-1/5"></td>
+              </tr>
+              
+              <!-- DRG Row -->
+              <tr>
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">DRG</td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-3/5">
+                      {{ groupingData.drg }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-[10%] text-right font-mono">
+                      {{ groupingData.drgCode }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-1/5 text-right font-mono whitespace-nowrap">
+                      DRG Cost Weight: <span class="text-blue-600 dark:text-blue-400 font-semibold">** {{ groupingData.costWeight || '0.00' }}</span>
                   </td>
               </tr>
-              <tr>
-                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium">DRG</td>
-                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
-                      {{ groupingData.drg }} <span class="float-right font-mono">{{ groupingData.drgCode }}</span>
+              
+              <!-- Top-up Row (hanya tampil jika ada topupOptions) -->
+              <tr v-if="groupingData.topupOptions && groupingData.topupOptions.length > 0">
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">
+                      {{ topupTypeLabel }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-3/5">
+                      <USelect
+                          v-model="selectedIdrgTopup"
+                          :options="[{ value: '', label: 'None' }, ...groupingData.topupOptions.map(o => ({ value: o.code, label: o.description }))]"
+                          class="w-64"
+                          :loading="isGroupingIdrgStage2"
+                          :disabled="groupingData.status === 'final'"
+                      />
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-[10%] text-right font-mono">
+                      {{ selectedIdrgTopup }}
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-1/5 text-right font-mono whitespace-nowrap">
+                      Top Up Cost Weight: <span class="text-blue-600 dark:text-blue-400 font-semibold">{{ displayTopupWeight === '-' ? '-' : '** ' + displayTopupWeight }}</span>
                   </td>
               </tr>
+              
+              <!-- NBR Row -->
               <tr>
-                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium">Status</td>
-                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200">
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">NBR</td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-3/5">
+                      <span class="text-blue-600 dark:text-blue-400 font-semibold">** {{ formatNumber(groupingData.nbr) }}</span>
+                  </td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-[10%] text-right"></td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-1/5 text-right font-mono whitespace-nowrap">
+                      Total Cost Weight: <span class="text-blue-600 dark:text-blue-400 font-semibold">** {{ displayTotalCostWeight }}</span>
+                  </td>
+              </tr>
+              
+              <!-- Total Klaim Row -->
+              <tr>
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Total Klaim</td>
+                  <td colspan="2" class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200"></td>
+                  <td class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 w-1/5 text-right font-semibold font-mono whitespace-nowrap">
+                      Rp <span class="text-blue-600 dark:text-blue-400">** {{ formatNumber(calculatedTotalKlaim) }}</span>
+                  </td>
+              </tr>
+              
+              <!-- Status Row -->
+              <tr>
+                  <td class="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 font-medium w-1/5">Status</td>
+                  <td colspan="3" class="px-6 py-2 text-sm text-gray-900 dark:text-gray-200 capitalize">
                       {{ groupingData.status }}
                   </td>
               </tr>
           </tbody>
       </table>
+      
+      <!-- Warning Note at the bottom -->
+      <div class="px-6 py-2 text-xs text-blue-600 dark:text-blue-400 italic bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+          ** ) Catatan: Nilai belum final, sewaktu-waktu bisa berubah
+      </div>
   </div>
   <div class="flex justify-end gap-3 pt-5">
   
@@ -2990,9 +3283,7 @@ function getProsedurPayload() {
         Hasil Grouping INACBG
       </h3>
       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        Info: •• {{ regPeriksa?.pasien?.nm_pasien }}, {{ regPeriksa?.dokter?.nm_dokter }} @ 23 Sep 2025, 10.52 •• 
-        Kelas {{ state.kelas_rawat }} •• 
-        Tarif: TARIF RS KELAS C PEMERINTAH
+        Info: {{ claimDataState.coderName || 'INACBG' }} @ {{ groupingData.groupingDate || formatIndoDate(new Date()) }} •• Kelas {{ claimDataState.kelasRs || 'C' }} •• Tarif : {{ tarifRsLabel }}
       </p>
     </div>
     </div>
@@ -3000,6 +3291,13 @@ function getProsedurPayload() {
 <div class="pt-5 space-y-4">
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg text-sm divide-y divide-gray-200 dark:divide-gray-700">
     
+    <div class="px-4 py-3 flex items-center">
+      <span class="w-48 text-gray-500 dark:text-gray-400">Info</span>
+      <span class="font-medium text-gray-800 dark:text-gray-100">
+        {{ claimDataState.coderName || 'INACBG' }} @ {{ groupingData.groupingDate || formatIndoDate(new Date()) }} •• Kelas {{ claimDataState.kelasRs || 'C' }} •• Tarif : {{ tarifRsLabel }}
+      </span>
+    </div>
+
     <div class="px-4 py-3 flex items-center">
       <span class="w-48 text-gray-500 dark:text-gray-400">Jenis Rawat</span>
       <span class="font-medium text-gray-800 dark:text-gray-100">Rawat Inap Kelas {{ state.kelas_rawat }} ({{ state.los }} Hari)</span>
@@ -3020,7 +3318,10 @@ function getProsedurPayload() {
       <span class="w-48 text-gray-500 dark:text-gray-400">Sub Acute</span>
       <div class="flex-1 flex justify-between items-center">
         <span class="text-gray-500">-</span>
-        <span class="w-32 font-medium text-gray-800 dark:text-gray-100 text-right">Rp 0</span>
+        <div class="flex items-center gap-4 text-right">
+          <span class="font-mono text-gray-500 w-20">-</span>
+          <span class="w-32 font-medium text-gray-800 dark:text-gray-100 text-right">Rp 0</span>
+        </div>
       </div>
     </div>
     
@@ -3028,7 +3329,10 @@ function getProsedurPayload() {
       <span class="w-48 text-gray-500 dark:text-gray-400">Chronic</span>
       <div class="flex-1 flex justify-between items-center">
         <span class="text-gray-500">-</span>
-        <span class="w-32 font-medium text-gray-800 dark:text-gray-100 text-right">Rp 0</span>
+        <div class="flex items-center gap-4 text-right">
+          <span class="font-mono text-gray-500 w-20">-</span>
+          <span class="w-32 font-medium text-gray-800 dark:text-gray-100 text-right">Rp 0</span>
+        </div>
       </div>
     </div>
 
@@ -3069,6 +3373,27 @@ function getProsedurPayload() {
             <div class="flex items-center gap-4 text-right">
               <span class="font-mono text-gray-500 w-20">{{ inacbgResultData.specialDrugCode }}</span>
               <span class="w-32 font-medium text-gray-800 dark:text-gray-100">Rp {{ inacbgResultData.specialDrugTariff.toLocaleString('id-ID') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-4 py-3 flex items-center">
+          <span class="w-48 text-gray-500 dark:text-gray-400">Transfusi Darah</span>
+          <div class="flex-1 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-600 dark:text-gray-400">Jumlah kantong darah:</span>
+              <UInput
+                v-model.number="state.kantong_darah"
+                type="number"
+                min="0"
+                class="w-20"
+                :disabled="showInacbgReeditButton || isClaimFullyFinal"
+              />
+              <span class="text-sm text-gray-600 dark:text-gray-400">kantong</span>
+            </div>
+            <div class="flex items-center gap-4 text-right">
+              <span class="font-mono text-gray-500 w-20">-</span>
+              <span class="w-32"></span>
             </div>
           </div>
         </div>
