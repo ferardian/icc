@@ -1,3 +1,5 @@
+import { useAccessTokenStore } from '~/stores/accessToken'
+
 // Middleware untuk otentikasi route
 // Middleware ini memastikan bahwa pengguna memiliki token akses yang valid sebelum mengakses rute tertentu
 export default defineNuxtRouteMiddleware(async (to, from) => {
