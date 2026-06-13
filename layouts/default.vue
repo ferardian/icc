@@ -1,6 +1,22 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useAccessTokenStore } from '~/stores/accessToken'
+
 const route = useRoute()
-const links = [
+const runtimeConfig = useRuntimeConfig()
+const tokenStore = useAccessTokenStore()
+
+const headers = computed(() => ({
+  Authorization: tokenStore.accessToken ? `Bearer ${tokenStore.accessToken}` : '',
+  Accept: "application/json",
+}))
+
+const { data: userDetail } = await useFetch<any>(`${runtimeConfig.public.API_V2_URL}/user/auth/detail`, {
+  headers,
+  watch: [() => tokenStore.accessToken]
+})
+
+const links = computed(() => [
   [],
   [
     {
@@ -13,9 +29,14 @@ const links = [
     { "label": "Grade III", "icon": "i-tabler-alert-triangle", "to": "/grade-3" }
   ],
   [
+    { 
+      "label": userDetail.value?.detail?.nama || 'User', 
+      "icon": "i-tabler-user",
+      "disabled": true
+    },
     { "label": "Logout", "icon": "i-tabler-logout", "to": "/auth/logout" },
   ],
-];
+])
 </script>
 
 <template>
