@@ -30,7 +30,7 @@ const links = computed(() => [
   ],
   [
     { 
-      "label": userDetail.value?.detail?.nama || 'User', 
+      "label": userDetail.value?.data?.detail?.nama || 'User', 
       "icon": "i-tabler-user",
       "disabled": true
     },
