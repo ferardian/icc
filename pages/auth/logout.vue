@@ -43,9 +43,11 @@ const logout = async () => {
         'Authorization': `Bearer ${tokenStore.accessToken}`
       }
     })
-    router.push('/auth/login')
   } catch (error) {
     console.error('Logout failed:', error)
+  } finally {
+    tokenStore.clearToken()
+    router.push('/auth/login')
   }
 }
 

@@ -11,9 +11,13 @@ const headers = computed(() => ({
   Accept: "application/json",
 }))
 
-const { data: userDetail } = await useFetch<any>(`${runtimeConfig.public.API_V2_URL}/user/auth/detail`, {
+const detailUrl = computed(() => {
+  return tokenStore.accessToken ? `${runtimeConfig.public.API_V2_URL}/user/auth/detail` : null
+})
+
+const { data: userDetail } = await useFetch<any>(detailUrl, {
   headers,
-  watch: [() => tokenStore.accessToken]
+  key: `user-detail-${tokenStore.accessToken || 'guest'}`
 })
 
 const links = computed(() => [

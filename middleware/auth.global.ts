@@ -30,17 +30,10 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
   };
 
   try {
-    // Lakukan panggilan API untuk memeriksa kevalidan token akses
-    const { error } = await useFetch(`${runtimeConfig.public.API_V2_URL}/user/auth/detail`, {
+    // Lakukan panggilan API untuk memeriksa kevalidan token akses menggunakan $fetch (tanpa cache)
+    await $fetch(`${runtimeConfig.public.API_V2_URL}/user/auth/detail`, {
       headers
     })
-
-    // Jika panggilan API tidak berhasil atau token tidak valid,
-    // hapus token akses dan arahkan kembali ke halaman login
-    if (error.value) {
-      accessTokenStore.clearToken()
-      return navigateTo("/auth/login")
-    }
 
     // Jika rute yang diminta adalah halaman yang dikecualikan,
     // arahkan kembali ke halaman utama
@@ -52,7 +45,7 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     accessTokenStore.setToken(accessToken)
     return
   } catch (error) {
-    // Jika terjadi kesalahan saat melakukan panggilan API,
+    // Jika terjadi kesalahan saat melakukan panggilan API (seperti 401),
     // hapus token akses dan arahkan kembali ke halaman login
     accessTokenStore.clearToken()
     return navigateTo("/auth/login")
