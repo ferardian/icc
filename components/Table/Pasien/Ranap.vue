@@ -665,7 +665,7 @@ if (props?.query?.month) {
 // if terkirim on query url
 if (props?.query?.terkirim) {
   statusTerkirim.value = 'terkirim'
-  masukKeluar.value = 'masuk'
+  masukKeluar.value = 'keluar'
   
   if (!bodyReqs.value.scopes.some((s: any) => s.name === 'hasBerkasPerawatan')) {
     bodyReqs.value.scopes.push({ name: 'hasBerkasPerawatan' })
