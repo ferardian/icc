@@ -228,10 +228,8 @@ const addToaster = (title: string, description: string, color: any, icon: string
 // Function to sync CPPT
 const syncCppt = async (noRawat: string, tglPerawatan: string, jamRawat: string) => {
   syncLoading.value = true;
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  const { data, error, refresh, status } = await useAsyncData(
-    `${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/sync`,
-    () => $fetch(`${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/sync`, {
+  try {
+    await $fetch(`${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/sync`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token.accessToken}`,
@@ -239,30 +237,23 @@ const syncCppt = async (noRawat: string, tglPerawatan: string, jamRawat: string)
         'Accept': 'application/json'
       },
       body: JSON.stringify({ no_rawat: noRawat, tgl_perawatan: tglPerawatan, jam_rawat: jamRawat })
-    }),
-    { immediate: true, lazy: true }
-  );
+    });
 
-  syncLoading.value = false;
-
-  if (status.value === 'success') {
-    cpptRefresh();
+    await cpptRefresh();
     addToaster('CPPT Synced', 'Data CPPT berhasil disinkronisasi', 'primary', 'i-tabler-check');
-  }
-
-  if (status.value === 'error') {
-    console.error('Error syncing CPPT:', error.value);
-    addToaster('Gagal Sync CPPT', (error.value?.data as any)?.message || 'Terjadi kesalahan saat menyinkronisasi CPPT', 'red', 'i-tabler-circle-x');
+  } catch (error: any) {
+    console.error('Error syncing CPPT:', error);
+    addToaster('Gagal Sync CPPT', error?.data?.message || error?.message || 'Terjadi kesalahan saat menyinkronisasi CPPT', 'red', 'i-tabler-circle-x');
+  } finally {
+    syncLoading.value = false;
   }
 }
 
 // Function to delete CPPT
 const deleteCppt = async (noRawat: string, tglPerawatan: string, jamRawat: string) => {
   syncLoading.value = true;
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  const { data, error, refresh, status } = await useAsyncData(
-    `${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/delete/synced`,
-    () => $fetch(`${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/delete/synced`, {
+  try {
+    await $fetch(`${config.public.API_V2_URL}/pasien/riwayat/pemeriksaan/${props.statusLanjut}/delete/synced`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token.accessToken}`,
@@ -270,20 +261,15 @@ const deleteCppt = async (noRawat: string, tglPerawatan: string, jamRawat: strin
         'Accept': 'application/json'
       },
       body: JSON.stringify({ no_rawat: noRawat, tgl_perawatan: tglPerawatan, jam_rawat: jamRawat })
-    }),
-    { immediate: true, lazy: true }
-  );
+    });
 
-  syncLoading.value = false;
-
-  if (status.value === 'success') {
-    cpptRefresh();
+    await cpptRefresh();
     addToaster('CPPT Deleted', 'Data CPPT berhasil dihapus', 'primary', 'i-tabler-check');
-  }
-
-  if (status.value === 'error') {
-    console.error('Error deleting CPPT:', error.value);
-    addToaster('Gagal Hapus CPPT', (error.value?.data as any)?.message || 'Terjadi kesalahan saat menghapus CPPT', 'red', 'i-tabler-circle-x');
+  } catch (error: any) {
+    console.error('Error deleting CPPT:', error);
+    addToaster('Gagal Hapus CPPT', error?.data?.message || error?.message || 'Terjadi kesalahan saat menghapus CPPT', 'red', 'i-tabler-circle-x');
+  } finally {
+    syncLoading.value = false;
   }
 }
 </script>
